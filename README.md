@@ -1,2 +1,3 @@
-# dan63047pythonbot
- lol
+#### Мой личный бот на python для ВК
+# от dan63047
+ 
