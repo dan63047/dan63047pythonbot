@@ -1,16 +1,18 @@
 import vk_api
 import datetime
 import requests
+import logging
 from config import vk
 from bs4 import BeautifulSoup
 from vk_api.longpoll import VkLongPoll, VkEventType
 
+bot_logger = logging.getLogger("dan63047bot")
 
 class VkBot:
 
     def __init__(self, peer_id):
 
-        print("\nСоздан объект бота!")
+        bot_logger.info("Создан объект бота!")
         self._USER_ID = peer_id
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help"]
@@ -31,12 +33,15 @@ class VkBot:
         return result
 
     def get_info_user(self, id):
+        logger = logging.getLogger("dan63047bot.get_info_user")
         try:
             user_info = vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
         except vk_api.exceptions.ApiError as lol:
             answer = "Пользователь не найден<br>"+str(lol)
+            logger.warning(answer)
             return answer
         
+        logger.info("Результат метода API users.get: "+str(user_info))
         if user_info[0]['is_closed']:
             is_closed = "Да"
         else:
@@ -73,12 +78,15 @@ class VkBot:
         return answer
 
     def get_info_group(self, id):
+        logger = logging.getLogger("dan63047bot.get_info_group")
         try:
             group_info = vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
         except vk_api.exceptions.ApiError as lol:
             answer = "Группа не найдена<br>"+str(lol)
+            logger.warning(answer)
             return answer
         
+        logger.info("Результат метода API groups.getById: "+str(group_info))
         if group_info[0]['description'] == "":
             description = "Отсутствует"
         else:
