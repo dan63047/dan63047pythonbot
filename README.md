@@ -6,3 +6,5 @@
     import vk_api
     token = "*токен вашего сообщества*"
     vk = vk_api.VkApi(token=token)
+
+Запустите `start.py`, что-бы бот начал слушать сервер
