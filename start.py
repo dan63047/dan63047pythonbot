@@ -29,7 +29,7 @@ for event in longpoll.listen():
 
             bot = VkBot(event.peer_id)
             bot_answer = bot.new_message(event.text)
-            if bot_answer['text']:
+            if bot_answer['text'] or bot_answer['attachment']:
                 write_msg(event.peer_id, bot_answer['text'], bot_answer['attachment'])
             
             logging.info(f'Ответ бота: {bot_answer}')

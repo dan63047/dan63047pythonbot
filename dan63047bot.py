@@ -2,7 +2,8 @@ import vk_api
 import datetime
 import requests
 import logging
-from config import vk
+import pyowm
+from config import vk, owm
 from bs4 import BeautifulSoup
 from vk_api.longpoll import VkLongPoll, VkEventType
 
@@ -15,7 +16,7 @@ class VkBot:
         bot_logger.info("Создан объект бота!")
         self._USER_ID = peer_id
 
-        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help"]
+        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather"]
 
     @staticmethod
     def _clean_all_tag_from_str(string_line):
@@ -32,14 +33,24 @@ class VkBot:
                     not_skip = True
         return result
 
+    def get_weather(self, place):
+        logger = logging.getLogger("dan63047bot.get_weather")
+        try:
+            weather_request = owm.weather_at_place(place)
+        except pyowm.exceptions.api_response_error.NotFoundError as i:
+            logger.warning("Ошибка OpenWeather API: "+str(i))
+            return "Такого города нет, либо данных о погоде нет"
+        weather_answer = weather_request.get_weather()
+        logger.info("Результат поиска погоды через OpenWeather API: "+str(weather_answer))
+        return "В городе "+place+" сейчас "+weather_answer.get_detailed_status()+", "+str(round(weather_answer.get_temperature('celsius')['temp']))+"°C"
+
     def get_info_user(self, id):
         logger = logging.getLogger("dan63047bot.get_info_user")
         try:
             user_info = vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
         except vk_api.exceptions.ApiError as lol:
-            answer = "Пользователь не найден<br>"+str(lol)
-            logger.warning(answer)
-            return answer
+            logger.warning("Ошибка метода users.get: "+str(lol))
+            return "Пользователь не найден<br>"+str(lol)
         
         logger.info("Результат метода API users.get: "+str(user_info))
         if user_info[0]['is_closed']:
@@ -82,9 +93,8 @@ class VkBot:
         try:
             group_info = vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
         except vk_api.exceptions.ApiError as lol:
-            answer = "Группа не найдена<br>"+str(lol)
-            logger.warning(answer)
-            return answer
+            logger.warning("Ошибка метода groups.getById: "+str(lol))
+            return "Группа не найдена<br>"+str(lol)
         
         logger.info("Результат метода API groups.getById: "+str(group_info))
         if group_info[0]['description'] == "":
@@ -106,12 +116,26 @@ class VkBot:
             respond['text'] = "Ваш ид: "+str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет пока что только одну картинку (скоро планируется отправлять рандомную картинку из альбома)<br>!h, !help - справка<br>Дата последнего обновления: 04.04.2020 (перевод на python)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет пока что только одну картинку (скоро планируется отправлять рандомную картинку из альбома)<br>!weather *город* - отправляет текущую погоду в городе(данные из OpenWeather API)<br>!h, !help - справка<br>Дата последнего обновления: 05.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
-            respond['text'] = self.get_info_user(message[1])
+            try:
+                respond['text'] = self.get_info_user(message[1])
+            except IndexError:
+                respond['text'] = "Отсуствует аргумент"
         
         elif message[0] == self._COMMANDS[4]:
-            respond['text'] = self.get_info_group(message[1])
+            try:
+                respond['text'] = respond['text'] = self.get_info_group(message[1])
+            except IndexError:
+                respond['text'] = "Отсуствует аргумент"
+
+        elif message[0] == self._COMMANDS[6]:
+            try:
+                respond['text'] = respond['text'] = self.get_weather(message[1])
+            except IndexError:
+                respond['text'] = "Отсуствует аргумент"
+            except AttributeError as lol:
+                respond['text'] = "Пайтон в ахуе: "+str(lol)
 
         return respond
