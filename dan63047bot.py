@@ -3,7 +3,8 @@ import datetime
 import requests
 import logging
 import pyowm
-from config import vk, owm
+import random
+from config import vk, owm, vk_mda
 from bs4 import BeautifulSoup
 from vk_api.longpoll import VkLongPoll, VkEventType
 
@@ -106,18 +107,24 @@ class VkBot:
         answer = group_info[0]['name']+"<br>Описание: "+description+"<br>Ид группы: "+str(group_info[0]['id'])+"<br>Подписчиков: "+str(group_info[0]['members_count'])
         return answer
 
+    def random_image(self):
+        logger = logging.getLogger("dan63047bot.random_image")
+        random_images_query = vk_mda.method('photos.get', {'owner_id': -190322075, 'album_id': 269199619, 'count': 1000})
+        logger.info("Результат метода photos.get: "+str(random_images_query))
+        random_number = random.randrange(random_images_query['count']-1)
+        return "photo"+str(random_images_query['items'][random_number]['owner_id'])+"_"+str(random_images_query['items'][random_number]['id'])
+
     def new_message(self, message):
         respond = {'attachment': None, 'text': None}
         message = message.split(' ')
         if message[0] == self._COMMANDS[0]:
-            respond['text'] = "hueh"
-            respond['attachment'] = "photo-190322075_457239033" 
+            respond['attachment'] = self.random_image() 
 
         elif message[0] == self._COMMANDS[1]:
             respond['text'] = "Ваш ид: "+str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет пока что только одну картинку (скоро планируется отправлять рандомную картинку из альбома)<br>!weather *город* - отправляет текущую погоду в городе(данные из OpenWeather API)<br>!h, !help - справка<br>Дата последнего обновления: 05.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!h, !help - справка<br>Дата последнего обновления: 06.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
