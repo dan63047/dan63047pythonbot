@@ -9,6 +9,7 @@
 import vk_api
 import pyowm
 vk = vk_api.VkApi(token="vk_group_access_token") # Токен сообщества в ВК
+vk_mda = vk_api.VkApi(token="vk_app_service_key") # Костыль для того, чтобы работал метод photos.get
 own = pyowm.OWM('OpenWeather_api_key', language='ru') # Ключ OpenWeather API для функции погоды
 ```
 
