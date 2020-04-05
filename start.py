@@ -5,7 +5,7 @@ import logging
 from config import vk
 from bs4 import BeautifulSoup
 from dan63047bot import VkBot
-from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 root_logger= logging.getLogger()
 root_logger.setLevel(logging.INFO)
@@ -19,17 +19,16 @@ def write_msg(peer_id, message, attachment=None):
                                 'random_id': time.time(),
                                 'attachment': attachment})
 
-longpoll = VkLongPoll(vk)  # Работа с сообщениями
+longpoll = VkBotLongPoll(vk, 190322075)  # Работа с сообщениями
 logging.info("Бот начал работу")
 for event in longpoll.listen():
-    if event.type == VkEventType.MESSAGE_NEW:
-        if event.to_me:
+    if event.type == VkBotEventType.MESSAGE_NEW:
 
-            logging.info(f'Получено сообщение от id{event.peer_id}: {event.text}')
+        logging.info(f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
 
-            bot = VkBot(event.peer_id)
-            bot_answer = bot.new_message(event.text)
-            if bot_answer['text'] or bot_answer['attachment']:
-                write_msg(event.peer_id, bot_answer['text'], bot_answer['attachment'])
-            
-            logging.info(f'Ответ бота: {bot_answer}')
+        bot = VkBot(event.message.peer_id, event.message.from_id)
+        bot_answer = bot.new_message(event.message.text)
+        if bot_answer['text'] or bot_answer['attachment']:
+            write_msg(event.message.peer_id, bot_answer['text'], bot_answer['attachment'])
+        
+        logging.info(f'Ответ бота: {bot_answer}')

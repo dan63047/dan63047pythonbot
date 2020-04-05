@@ -11,10 +11,11 @@ bot_logger = logging.getLogger("dan63047bot")
 
 class VkBot:
 
-    def __init__(self, peer_id):
+    def __init__(self, peer_id, user_id):
 
         bot_logger.info("Создан объект бота!")
-        self._USER_ID = peer_id
+        self._USER_ID = user_id
+        self._CHAT_ID = peer_id
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather"]
 
