@@ -1,9 +1,7 @@
 import vk_api
 import time
-import requests
 import logging
-from config import vk
-from bs4 import BeautifulSoup
+from config import vk, group_id
 from dan63047bot import VkBot
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
@@ -19,7 +17,7 @@ def write_msg(peer_id, message, attachment=None):
                                 'random_id': time.time(),
                                 'attachment': attachment})
 
-longpoll = VkBotLongPoll(vk, 190322075)  # Работа с сообщениями
+longpoll = VkBotLongPoll(vk, group_id)  # Работа с сообщениями
 logging.info("Бот начал работу")
 for event in longpoll.listen():
     if event.type == VkBotEventType.MESSAGE_NEW:
