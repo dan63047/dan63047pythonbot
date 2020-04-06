@@ -4,6 +4,7 @@ import requests
 import logging
 import pyowm
 import random
+import wikipediaapi as wiki
 from config import vk, owm, vk_mda
 from bs4 import BeautifulSoup
 from vk_api.longpoll import VkLongPoll, VkEventType
@@ -18,7 +19,7 @@ class VkBot:
         self._USER_ID = user_id
         self._CHAT_ID = peer_id
 
-        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather"]
+        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki"]
 
     @staticmethod
     def _clean_all_tag_from_str(string_line):
@@ -110,13 +111,22 @@ class VkBot:
     def random_image(self):
         logger = logging.getLogger("dan63047bot.random_image")
         random_images_query = vk_mda.method('photos.get', {'owner_id': -190322075, 'album_id': 269199619, 'count': 1000})
-        logger.info("Результат метода photos.get: "+str(random_images_query))
-        random_number = random.randrange(random_images_query['count']-1)
+        logger.info("Результат метода photos.get: Получено "+str(random_images_query['count'])+" фото")
+        random_number = random.randrange(random_images_query['count'])
         return "photo"+str(random_images_query['items'][random_number]['owner_id'])+"_"+str(random_images_query['items'][random_number]['id'])
+
+    def wiki_article(self, search):
+        w = wiki.Wikipedia('ru')
+        page = w.page(search)
+        if page.exists():
+            answer = page.title+"<br>"+page.summary
+        else:
+            answer = "Такой статьи не существует"
+        return answer
 
     def new_message(self, message):
         respond = {'attachment': None, 'text': None}
-        message = message.split(' ')
+        message = message.split(' ', 1)
         if message[0] == self._COMMANDS[0]:
             respond['attachment'] = self.random_image() 
 
@@ -134,16 +144,20 @@ class VkBot:
         
         elif message[0] == self._COMMANDS[4]:
             try:
-                respond['text'] = respond['text'] = self.get_info_group(message[1])
+                respond['text'] = self.get_info_group(message[1])
             except IndexError:
                 respond['text'] = "Отсуствует аргумент"
 
         elif message[0] == self._COMMANDS[6]:
             try:
-                respond['text'] = respond['text'] = self.get_weather(message[1])
+                respond['text'] = self.get_weather(message[1])
             except IndexError:
                 respond['text'] = "Отсуствует аргумент"
-            except AttributeError as lol:
-                respond['text'] = "Пайтон в ахуе: "+str(lol)
+
+        elif message[0] == self._COMMANDS[7]:
+            try:
+                respond['text'] = self.wiki_article(message[1])
+            except IndexError:
+                respond['text'] = "Отсуствует аргумент"
 
         return respond
