@@ -134,7 +134,7 @@ class VkBot:
             respond['text'] = "Ваш ид: "+str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!h, !help - справка<br>Дата последнего обновления: 06.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!h, !help - справка<br>Дата последнего обновления: 06.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
