@@ -20,13 +20,17 @@ def write_msg(peer_id, message, attachment=None):
 longpoll = VkBotLongPoll(vk, group_id)  # Работа с сообщениями
 logging.info("Бот начал работу")
 for event in longpoll.listen():
-    if event.type == VkBotEventType.MESSAGE_NEW:
+    try:
+        if event.type == VkBotEventType.MESSAGE_NEW:
 
-        logging.info(f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
+            logging.info(f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
 
-        bot = VkBot(event.message.peer_id, event.message.from_id)
-        bot_answer = bot.new_message(event.message.text)
-        if bot_answer['text'] or bot_answer['attachment']:
-            write_msg(event.message.peer_id, bot_answer['text'], bot_answer['attachment'])
-        
-        logging.info(f'Ответ бота: {bot_answer}')
+            bot = VkBot(event.message.peer_id, event.message.from_id)
+            bot_answer = bot.new_message(event.message.text)
+            if bot_answer['text'] or bot_answer['attachment']:
+                write_msg(event.message.peer_id, bot_answer['text'], bot_answer['attachment'])
+            
+            logging.info(f'Ответ бота: {bot_answer}')
+    except Exception as kek:
+        logging.warning("Беды с ботом: "+str(kek))
+        continue

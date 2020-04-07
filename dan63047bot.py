@@ -4,6 +4,7 @@ import requests
 import logging
 import pyowm
 import random
+import json
 import wikipediaapi as wiki
 from config import vk, owm, vk_mda
 from bs4 import BeautifulSoup
@@ -19,7 +20,7 @@ class VkBot:
         self._USER_ID = user_id
         self._CHAT_ID = peer_id
 
-        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki"]
+        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn"]
 
     @staticmethod
     def _clean_all_tag_from_str(string_line):
@@ -124,6 +125,12 @@ class VkBot:
             answer = "Такой статьи не существует"
         return answer
 
+    def exchange_rates(self):
+        rates_USD = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/145?periodicity=0").text)
+        rates_EUR = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/292?periodicity=0").text)
+        rates_RUB = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/298?periodicity=0").text)
+        return "Текущий курс валют по данным НБ РБ:<br>"+rates_USD['Cur_Name']+": "+str(rates_USD['Cur_Scale'])+" "+rates_USD['Cur_Abbreviation']+" = "+str(rates_USD['Cur_OfficialRate'])+" BYN<br>"+rates_EUR['Cur_Name']+": "+str(rates_EUR['Cur_Scale'])+" "+rates_EUR['Cur_Abbreviation']+" = "+str(rates_EUR['Cur_OfficialRate'])+" BYN<br>"+"Российский рубль"+": "+str(rates_RUB['Cur_Scale'])+" "+rates_RUB['Cur_Abbreviation']+" = "+str(rates_RUB['Cur_OfficialRate'])+" BYN"
+
     def new_message(self, message):
         respond = {'attachment': None, 'text': None}
         message = message.split(' ', 1)
@@ -134,7 +141,7 @@ class VkBot:
             respond['text'] = "Ваш ид: "+str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!h, !help - справка<br>Дата последнего обновления: 06.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!h, !help - справка<br>Дата последнего обновления: 06.04.2020<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
@@ -159,5 +166,8 @@ class VkBot:
                 respond['text'] = self.wiki_article(message[1])
             except IndexError:
                 respond['text'] = "Отсуствует аргумент"
+        
+        elif message[0] == self._COMMANDS[8]: 
+            respond['text'] = self.exchange_rates()
 
         return respond
