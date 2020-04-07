@@ -7,7 +7,6 @@ import random
 import json
 import wikipediaapi as wiki
 from config import vk, owm, vk_mda
-from bs4 import BeautifulSoup
 from vk_api.longpoll import VkLongPoll, VkEventType
 
 bot_logger = logging.getLogger("dan63047bot")
@@ -21,21 +20,6 @@ class VkBot:
         self._CHAT_ID = peer_id
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn"]
-
-    @staticmethod
-    def _clean_all_tag_from_str(string_line):
-        result = ""
-        not_skip = True
-        for i in list(string_line):
-            if not_skip:
-                if i == "<":
-                    not_skip = False
-                else:
-                    result += i
-            else:
-                if i == ">":
-                    not_skip = True
-        return result
 
     def get_weather(self, place):
         logger = logging.getLogger("dan63047bot.get_weather")
