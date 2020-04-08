@@ -1,6 +1,7 @@
 import vk_api
 import time
 import logging
+import requests
 from config import vk, group_id
 from dan63047bot import VkBot
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
@@ -17,9 +18,20 @@ def write_msg(peer_id, message, attachment=None):
                                 'random_id': time.time(),
                                 'attachment': attachment})
 
-longpoll = VkBotLongPoll(vk, group_id)  # Работа с сообщениями
+longpoll = VkBotLongPoll(vk, group_id)
+
+def listening():
+    while True:
+        try:
+            event = longpoll.listen()
+            return event
+        except requests.exceptions.ReadTimeout as mda:
+            logging.warning("Беды с ВК: "+str(mda))
+            continue
+
 logging.info("Бот начал работу")
-for event in longpoll.listen():
+
+for event in listening():
     try:
         if event.type == VkBotEventType.MESSAGE_NEW:
 
@@ -34,3 +46,4 @@ for event in longpoll.listen():
     except Exception as kek:
         logging.warning("Беды с ботом: "+str(kek))
         continue
+    
