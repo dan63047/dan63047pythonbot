@@ -25,7 +25,7 @@ def listening():
         try:
             event = longpoll.listen()
             return event
-        except requests.exceptions.ReadTimeout as mda:
+        except Exception as mda:
             logging.warning("Беды с ВК: "+str(mda))
             continue
 
