@@ -117,7 +117,7 @@ class VkBot:
             rates_RUB = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/298?periodicity=0", timeout=10).text)
             return "Текущий курс валют по данным НБ РБ:<br>"+rates_USD['Cur_Name']+": "+str(rates_USD['Cur_Scale'])+" "+rates_USD['Cur_Abbreviation']+" = "+str(rates_USD['Cur_OfficialRate'])+" BYN<br>"+rates_EUR['Cur_Name']+": "+str(rates_EUR['Cur_Scale'])+" "+rates_EUR['Cur_Abbreviation']+" = "+str(rates_EUR['Cur_OfficialRate'])+" BYN<br>"+"Российский рубль"+": "+str(rates_RUB['Cur_Scale'])+" "+rates_RUB['Cur_Abbreviation']+" = "+str(rates_RUB['Cur_OfficialRate'])+" BYN"
         except Exception as mda:
-            return "Невозможно получить данные из НБ РБД: "+str(mda)
+            return "Невозможно получить данные из НБ РБ: "+str(mda)
 
     async def new_message(self, message):
         respond = {'attachment': None, 'text': None}
@@ -129,7 +129,7 @@ class VkBot:
             respond['text'] = "Ваш ид: "+str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!h, !help - справка<br>Дата последнего обновления: 07.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!h, !help - справка<br>Дата последнего обновления: 10.04.2020 (попытка использовать async/await)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
