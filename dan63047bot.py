@@ -5,6 +5,7 @@ import logging
 import pyowm
 import random
 import json
+import asyncio
 import wikipediaapi as wiki
 from config import vk, owm, vk_mda
 from vk_api.longpoll import VkLongPoll, VkEventType
@@ -110,12 +111,15 @@ class VkBot:
         return answer
 
     def exchange_rates(self):
-        rates_USD = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/145?periodicity=0").text)
-        rates_EUR = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/292?periodicity=0").text)
-        rates_RUB = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/298?periodicity=0").text)
-        return "Текущий курс валют по данным НБ РБ:<br>"+rates_USD['Cur_Name']+": "+str(rates_USD['Cur_Scale'])+" "+rates_USD['Cur_Abbreviation']+" = "+str(rates_USD['Cur_OfficialRate'])+" BYN<br>"+rates_EUR['Cur_Name']+": "+str(rates_EUR['Cur_Scale'])+" "+rates_EUR['Cur_Abbreviation']+" = "+str(rates_EUR['Cur_OfficialRate'])+" BYN<br>"+"Российский рубль"+": "+str(rates_RUB['Cur_Scale'])+" "+rates_RUB['Cur_Abbreviation']+" = "+str(rates_RUB['Cur_OfficialRate'])+" BYN"
+        try:
+            rates_USD = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/145?periodicity=0", timeout=10).text)
+            rates_EUR = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/292?periodicity=0", timeout=10).text)
+            rates_RUB = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/298?periodicity=0", timeout=10).text)
+            return "Текущий курс валют по данным НБ РБ:<br>"+rates_USD['Cur_Name']+": "+str(rates_USD['Cur_Scale'])+" "+rates_USD['Cur_Abbreviation']+" = "+str(rates_USD['Cur_OfficialRate'])+" BYN<br>"+rates_EUR['Cur_Name']+": "+str(rates_EUR['Cur_Scale'])+" "+rates_EUR['Cur_Abbreviation']+" = "+str(rates_EUR['Cur_OfficialRate'])+" BYN<br>"+"Российский рубль"+": "+str(rates_RUB['Cur_Scale'])+" "+rates_RUB['Cur_Abbreviation']+" = "+str(rates_RUB['Cur_OfficialRate'])+" BYN"
+        except Exception as mda:
+            return "Невозможно получить данные из НБ РБД: "+str(mda)
 
-    def new_message(self, message):
+    async def new_message(self, message):
         respond = {'attachment': None, 'text': None}
         message = message.split(' ', 1)
         if message[0] == self._COMMANDS[0]:
