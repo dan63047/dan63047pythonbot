@@ -8,20 +8,38 @@ import random
 import json
 import asyncio
 import wikipediaapi as wiki
-from config import vk, owm, vk_mda
+from config import vk, owm, vk_mda, group_id
 from vk_api.longpoll import VkLongPoll, VkEventType
+from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
-bot_logger = logging.getLogger("dan63047bot")
+root_logger= logging.getLogger()
+root_logger.setLevel(logging.INFO)
+handler = logging.FileHandler('bot.log', 'w', 'utf-8')
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+root_logger.addHandler(handler)
+
+longpoll = VkBotLongPoll(vk, group_id)
+
+class MyVkLongPoll(VkBotLongPoll):
+    def listen(self):
+        while True:
+            try: 
+                for event in self.check():
+                    yield event
+            except Exception as e:
+                logging.warning("Беды с ВК: "+str(e))
+                time.sleep(15)
+                continue
 
 class VkBot:
 
     def __init__(self, peer_id, user_id):
 
-        bot_logger.info("Создан объект бота!")
+        logging.info(f"Создан объект бота! id{peer_id}")
         self._USER_ID = user_id
         self._CHAT_ID = peer_id
 
-        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn"]
+        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn", "!echo"]
 
     def get_weather(self, place):
         logger = logging.getLogger("dan63047bot.get_weather")
@@ -130,7 +148,7 @@ class VkBot:
             respond['text'] = "Ваш ид: "+str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!h, !help - справка<br>Дата последнего обновления: 10.04.2020 (попытка использовать async/await)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите(работа команды не проверена)<br>!h, !help - справка<br>Дата последнего обновления: 12.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
@@ -158,5 +176,36 @@ class VkBot:
         
         elif message[0] == self._COMMANDS[8]: 
             respond['text'] = await self.exchange_rates()
-        message = vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': respond['text'], 'random_id': time.time(), 'attachment': respond['attachment']})
-        bot_logger.info(f'Ответ бота: {respond}')
+
+        elif message[0] == self._COMMANDS[9]:
+            vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': "echo on", 'random_id': time.time()})
+            for event in MyVkLongPoll.listen(longpoll):
+                if event.type == VkBotEventType.MESSAGE_NEW:
+                    if event.message.text == "!echo off":
+                        respond['text'] = "echo off"
+                        break
+                    else:
+                        vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': event.message.text, 'random_id': time.time()})
+                
+        if respond['text'] or respond['attachment']:
+            message = vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': respond['text'], 'random_id': time.time(), 'attachment': respond['attachment']})
+            logging.info(f'Ответ бота в чат id{self._CHAT_ID}: {respond}')
+
+async def main():
+    bot = {}
+    for event in MyVkLongPoll.listen(longpoll):
+        try:
+            if event.type == VkBotEventType.MESSAGE_NEW:
+                logging.info(f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
+                if event.message.peer_id in bot:
+                    await bot[event.message.peer_id].new_message(event.message.text)
+                else:
+                    bot[event.message.peer_id] = VkBot(event.message.peer_id, event.message.from_id)
+                    await bot[event.message.peer_id].new_message(event.message.text)
+        except Exception as kek:
+            logging.warning("Беды с ботом: "+str(kek))
+            continue   
+
+logging.info("Бот начал работу")
+
+asyncio.run(main())
