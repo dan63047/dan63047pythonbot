@@ -15,25 +15,23 @@ root_logger.addHandler(handler)
 
 longpoll = VkBotLongPoll(vk, group_id)
 
-def listening():
-    while True:
-        try:
-            event = longpoll.listen()
-            return event
-        except Exception as mda:
-            logging.warning("Беды с ВК: "+str(mda))
-            continue
+class MyVkLongPoll(VkBotLongPoll):
+    def listen(self):
+        while True:
+            try: 
+                for event in self.check():
+                    yield event
+            except Exception as e:
+                logging.warning("Беды с ВК: "+str(e))
+                continue
 
 async def main():
-    for event in listening():
+    for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 logging.info(f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
                 bot = VkBot(event.message.peer_id, event.message.from_id)
-                result = await bot.new_message(event.message.text)
-                message = vk.method('messages.send', {'peer_id': event.message.peer_id, 'message': result['text'], 'random_id': time.time(), 'attachment': result['attachment']})
-                logging.info(f'Ответ бота: {result}')
-                logging.info(f'Отправлено методом messages.send: {message}')
+                await bot.new_message(event.message.text)
         except Exception as kek:
             logging.warning("Беды с ботом: "+str(kek))
             continue   

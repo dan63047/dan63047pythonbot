@@ -1,5 +1,6 @@
 import vk_api
 import datetime
+import time
 import requests
 import logging
 import pyowm
@@ -110,7 +111,7 @@ class VkBot:
             answer = "Такой статьи не существует"
         return answer
 
-    def exchange_rates(self):
+    async def exchange_rates(self):
         try:
             rates_USD = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/145?periodicity=0", timeout=10).text)
             rates_EUR = json.loads(requests.get("https://www.nbrb.by/api/exrates/rates/292?periodicity=0", timeout=10).text)
@@ -156,6 +157,6 @@ class VkBot:
                 respond['text'] = "Отсуствует аргумент"
         
         elif message[0] == self._COMMANDS[8]: 
-            respond['text'] = self.exchange_rates()
-
-        return respond
+            respond['text'] = await self.exchange_rates()
+        message = vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': respond['text'], 'random_id': time.time(), 'attachment': respond['attachment']})
+        bot_logger.info(f'Ответ бота: {respond}')
