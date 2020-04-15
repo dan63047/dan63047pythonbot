@@ -149,9 +149,11 @@ class VkBot:
             logger.warning("Ошибка метода users.get: " + str(lol))
             return "Пользователь не найден<br>" + str(lol)
 
-        logger.info("Результат метода API users.get: " + str(user_info))
-        if user_info[0]['first_name'] == "DELETED":
-            return "Профиль был удалён"
+        if "deactivated" in user_info[0]:
+            if user_info[0]['deactivated'] == 'banned':
+                return user_info[0]['first_name'] + " " + user_info[0]['last_name'] + " забанен"
+            elif user_info[0]['deactivated'] == 'deleted':
+                return "Профиль был удалён"
 
         if user_info[0]['is_closed']:
             is_closed = "Да"
