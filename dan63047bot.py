@@ -150,6 +150,9 @@ class VkBot:
             return "Пользователь не найден<br>" + str(lol)
 
         logger.info("Результат метода API users.get: " + str(user_info))
+        if user_info[0]['first_name'] == "DELETED":
+            return "Профиль был удалён"
+
         if user_info[0]['is_closed']:
             is_closed = "Да"
         else:
