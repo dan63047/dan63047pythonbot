@@ -21,6 +21,15 @@ root_logger.addHandler(handler)
 longpoll = VkBotLongPoll(vk, group_id)
 
 
+def log(warning, text):
+    if warning:
+        logging.warning(text)
+        print("["+time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime())+"][WARNING] "+text)
+    else:
+        logging.info(text)
+        print("[" + time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime()) + "] " + text)
+
+
 def toFixed(numObj, digits=0):
     return f"{numObj:.{digits}f}"
 
@@ -32,20 +41,22 @@ class MyVkLongPoll(VkBotLongPoll):
                 for event in self.check():
                     yield event
             except Exception as e:
-                logging.warning("Беды с ВК: " + str(e))
+                err = "Беды с ВК: " + str(e)
+                log(True, err)
                 time.sleep(15)
                 continue
 
 
 def get_weather(place):
-    logger = logging.getLogger("dan63047bot.get_weather")
     try:
         weather_request = owm.weather_at_place(place)
     except pyowm.exceptions.api_response_error.NotFoundError as i:
-        logger.warning("Ошибка OpenWeather API: " + str(i))
+        err = "Ошибка OpenWeather API: " + str(i)
+        log(True, err)
         return "Такого города нет, либо данных о погоде нет"
     weather_answer = weather_request.get_weather()
-    logger.info("Результат поиска погоды через OpenWeather API: " + str(weather_answer))
+    info = "Результат поиска погоды через OpenWeather API: " + str(weather_answer)
+    log(False, info)
     return "В городе " + place + " сейчас " + weather_answer.get_detailed_status() + ", " + str(
         round(weather_answer.get_temperature('celsius')['temp'])) + "°C"
 
@@ -54,7 +65,7 @@ class VkBot:
 
     def __init__(self, peer_id, user_id):
 
-        logging.info(f"Создан объект бота! id{peer_id}")
+        log(False, f"Создан объект бота! id{peer_id}")
         self._USER_ID = user_id
         self._CHAT_ID = peer_id
         self._ECHO_MODE = False
@@ -68,10 +79,10 @@ class VkBot:
                 vk.method('messages.send',
                           {'peer_id': self._CHAT_ID, 'message': "Режим эхо выключен", 'random_id': time.time()})
                 self._ECHO_MODE = False
-                logging.info(f"Бот id{self._CHAT_ID} вышел из режима эхо")
+                log(False, f"Бот id{self._CHAT_ID} вышел из режима эхо")
             else:
                 vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': message, 'random_id': time.time()})
-                logging.info(f"Эхо-бот id{self._CHAT_ID}: {message}")
+                log(False, f"Эхо-бот id{self._CHAT_ID}: {message}")
         else:
             await self.send_message(message)
 
@@ -80,7 +91,7 @@ class VkBot:
             with open("data_file.json", "r") as read_file:
                 data = json.load(read_file)
                 if str(self._USER_ID) in data:
-                    winrate = (data[str(self._USER_ID)]['wins']/data[str(self._USER_ID)]['games'])*100
+                    winrate = (data[str(self._USER_ID)]['wins'] / data[str(self._USER_ID)]['games']) * 100
                     return f"Камень, ножницы, бумага<br>Сыграно игр: {data[str(self._USER_ID)]['games']}<br>Из них:<br>•Побед: {data[str(self._USER_ID)]['wins']}<br>•Поражений: {data[str(self._USER_ID)]['defeats']}<br>•Ничей: {data[str(self._USER_ID)]['draws']}<br>Процент побед: {toFixed(winrate, 2)}%"
                 else:
                     return "Похоже, вы ещё никогда не играли в Камень, ножницы, бумага"
@@ -142,11 +153,11 @@ class VkBot:
             return "Неверный аргумент<br>Использование команды:<br>!game *камень/ножницы/бумага/статистика*"
 
     def get_info_user(self, id):
-        logger = logging.getLogger("dan63047bot.get_info_user")
         try:
             user_info = vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
         except vk_api.exceptions.ApiError as lol:
-            logger.warning("Ошибка метода users.get: " + str(lol))
+            err = "Ошибка метода users.get: " + str(lol)
+            log(True, err)
             return "Пользователь не найден<br>" + str(lol)
 
         if "deactivated" in user_info[0]:
@@ -186,19 +197,22 @@ class VkBot:
 
         time = datetime.datetime.fromtimestamp(user_info[0]['last_seen']['time'])
 
-        answer = user_info[0]['first_name'] + " " + user_info[0]['last_name'] + "<br>Его ид: " + str(user_info[0]['id']) + "<br>Профиль закрыт: " + is_closed + "<br>Пол: " + sex + "<br>Последний онлайн: " + time.strftime('%d.%m.%Y в %H:%M:%S') + " (" + platform + ")"
+        answer = user_info[0]['first_name'] + " " + user_info[0]['last_name'] + "<br>Его ид: " + \
+                 str(user_info[0]['id']) + "<br>Профиль закрыт: " + is_closed + "<br>Пол: " + sex \
+                 + "<br>Последний онлайн: " + time.strftime('%d.%m.%Y в %H:%M:%S') + " (" + platform + ")"
 
         return answer
 
     def get_info_group(self, id):
-        logger = logging.getLogger("dan63047bot.get_info_group")
         try:
             group_info = vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
         except vk_api.exceptions.ApiError as lol:
-            logger.warning("Ошибка метода groups.getById: " + str(lol))
+            err = "Ошибка метода groups.getById: " + str(lol)
+            log(True, err)
             return "Группа не найдена<br>" + str(lol)
 
-        logger.info("Результат метода API groups.getById: " + str(group_info))
+        info = "Результат метода API groups.getById: " + str(group_info)
+        log(False, info)
         if group_info[0]['description'] == "":
             description = "Отсутствует"
         else:
@@ -209,10 +223,10 @@ class VkBot:
         return answer
 
     def random_image(self):
-        logger = logging.getLogger("dan63047bot.random_image")
         random_images_query = vk_mda.method('photos.get',
                                             {'owner_id': -190322075, 'album_id': 269199619, 'count': 1000})
-        logger.info("Результат метода photos.get: Получено " + str(random_images_query['count']) + " фото")
+        info = "Результат метода photos.get: Получено " + str(random_images_query['count']) + " фото"
+        log(False, info)
         random_number = random.randrange(random_images_query['count'])
         return "photo" + str(random_images_query['items'][random_number]['owner_id']) + "_" + str(
             random_images_query['items'][random_number]['id'])
@@ -242,6 +256,8 @@ class VkBot:
                 rates_RUB['Cur_Scale']) + " " + rates_RUB['Cur_Abbreviation'] + " = " + str(
                 rates_RUB['Cur_OfficialRate']) + " BYN"
         except Exception as mda:
+            err = "Ошибка получения данных из НБ РБ API: " + str(mda)
+            log(True, err)
             return "Невозможно получить данные из НБ РБ: " + str(mda)
 
     async def send_message(self, message):
@@ -254,7 +270,8 @@ class VkBot:
             respond['text'] = "Ваш ид: " + str(self._USER_ID)
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond['text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 13.04.2020<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+            respond[
+                'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 27.04.2020(Обновление логгера)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
@@ -285,10 +302,11 @@ class VkBot:
 
         elif message[0] == self._COMMANDS[9]:
             vk.method('messages.send', {'peer_id': self._CHAT_ID,
-                                        'message': "Теперь бот работает в режиме эхо. Чтобы это выключить, введить \"!echo off\"",
+                                        'message': "Теперь бот работает в режиме эхо. Чтобы"
+                                                   " это выключить, введить \"!echo off\"",
                                         'random_id': time.time()})
             self._ECHO_MODE = True
-            logging.info(f"Бот id{self._CHAT_ID} в режиме эхо")
+            log(False, f"Бот id{self._CHAT_ID} в режиме эхо")
 
         elif message[0] == self._COMMANDS[10]:
             try:
@@ -301,7 +319,7 @@ class VkBot:
             message = vk.method('messages.send',
                                 {'peer_id': self._CHAT_ID, 'message': respond['text'], 'random_id': time.time(),
                                  'attachment': respond['attachment']})
-            logging.info(f'Ответ бота в чат id{self._CHAT_ID}: {respond}')
+            log(False, f'Ответ бота в чат id{self._CHAT_ID}: {respond}')
 
 
 async def main():
@@ -309,17 +327,18 @@ async def main():
     for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
-                logging.info(f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
+                log(False, f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
                 if event.message.peer_id in bot:
                     await bot[event.message.peer_id].get_message(event.message.text)
                 else:
                     bot[event.message.peer_id] = VkBot(event.message.peer_id, event.message.from_id)
                     await bot[event.message.peer_id].get_message(event.message.text)
         except Exception as kek:
-            logging.warning("Беды с ботом: " + str(kek))
+            err = "Беды с ботом: " + str(kek)
+            log(True, err)
             continue
 
 
-logging.info("Бот начал работу")
+log(False, "Бот начал работу")
 
 asyncio.run(main())
