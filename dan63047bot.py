@@ -8,9 +8,12 @@ import random
 import json
 import asyncio
 import wikipediaapi as wiki
-from config import vk, owm, vk_mda, group_id
+from config import vk, owm, vk_mda, group_id, album_for_command, owner_id
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
+
+bot = {}
+debug_array = {'vk_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
 
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
@@ -24,6 +27,7 @@ longpoll = VkBotLongPoll(vk, group_id)
 def log(warning, text):
     if warning:
         logging.warning(text)
+        debug_array['logger_warnings'] += 1
         print("["+time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime())+"][WARNING] "+text)
     else:
         logging.info(text)
@@ -43,6 +47,7 @@ class MyVkLongPoll(VkBotLongPoll):
             except Exception as e:
                 err = "Беды с ВК: " + str(e)
                 log(True, err)
+                debug_array['vk_warnings'] += 1
                 time.sleep(15)
                 continue
 
@@ -70,8 +75,13 @@ class VkBot:
         self._CHAT_ID = peer_id
         self._ECHO_MODE = False
 
+        if self._USER_ID == owner_id and self._CHAT_ID <= 2000000000:
+            self._OWNER = True
+        else:
+            self._OWNER = False
+
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game"]
+                          "!echo", "!game", "!debug"]
 
     async def get_message(self, message):
         if self._ECHO_MODE:
@@ -85,6 +95,17 @@ class VkBot:
                 log(False, f"Эхо-бот id{self._CHAT_ID}: {message}")
         else:
             await self.send_message(message)
+
+    def debug(self):
+        up_time = time.time() - debug_array['start_time']
+        time_d = int(up_time) / (3600 * 24)
+        time_h = int(up_time) / 3600 - int(time_d) * 24
+        time_min = int(up_time) / 60 - int(time_h) * 60 - int(time_d) * 24 * 60
+        time_sec = int(up_time) - int(time_min) * 60 - int(time_h) * 3600 - int(time_d) * 24 * 60 * 60
+        str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
+        datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
+        return "Запуск бота: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S') + " (UPTIME: " + str_up_time + ")<br>Получено сообщений: " + str(debug_array['messages_get']) + " (Отвечено на: " + str(debug_array['messages_answered']) + ")<br>Дисконнектов: " + str(debug_array['vk_warnings']) + "<br>Обьектов бота: " + str(len(bot)) + "<br>Ошибок в работе: " + str(debug_array['logger_warnings'])
+
 
     def game(self, thing):
         if thing == "статистика":
@@ -223,8 +244,9 @@ class VkBot:
         return answer
 
     def random_image(self):
+        group = "-"+str(group_id)
         random_images_query = vk_mda.method('photos.get',
-                                            {'owner_id': -190322075, 'album_id': 269199619, 'count': 1000})
+                                            {'owner_id': group, 'album_id': album_for_command, 'count': 1000})
         info = "Результат метода photos.get: Получено " + str(random_images_query['count']) + " фото"
         log(False, info)
         random_number = random.randrange(random_images_query['count'])
@@ -271,7 +293,7 @@ class VkBot:
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
             respond[
-                'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 27.04.2020(Обновление логгера)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+                'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 04.05.2020(Внедрение дебаг функции)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
@@ -315,19 +337,23 @@ class VkBot:
             except IndexError:
                 respond['text'] = "Отсуствует аргумент"
 
+        elif message[0] == self._COMMANDS[11]:
+            respond['text'] = self.debug()
+
         if respond['text'] or respond['attachment']:
             message = vk.method('messages.send',
                                 {'peer_id': self._CHAT_ID, 'message': respond['text'], 'random_id': time.time(),
                                  'attachment': respond['attachment']})
+            debug_array['messages_answered'] += 1
             log(False, f'Ответ бота в чат id{self._CHAT_ID}: {respond}')
 
 
 async def main():
-    bot = {}
     for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 log(False, f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
+                debug_array['messages_get'] += 1
                 if event.message.peer_id in bot:
                     await bot[event.message.peer_id].get_message(event.message.text)
                 else:
@@ -340,5 +366,5 @@ async def main():
 
 
 log(False, "Бот начал работу")
-
+debug_array['start_time'] = time.time()
 asyncio.run(main())

@@ -11,6 +11,8 @@ import pyowm
 vk = vk_api.VkApi(token="vk_group_access_token") # Токен сообщества в ВК
 vk_mda = vk_api.VkApi(token="vk_app_service_key") # Костыль для того, чтобы работал метод photos.get
 group_id = 190322075 # Цифровой id вашего сообщества
+album_for_command = 269199619 # Цифровой id альбома для команды !image
+owner_id = 276193568 # Ваш цифровой id
 own = pyowm.OWM('OpenWeather_api_key', language='ru') # Ключ OpenWeather API для функции погоды
 ```
 
@@ -30,6 +32,7 @@ own = pyowm.OWM('OpenWeather_api_key', language='ru') # Ключ OpenWeather API
 * **!byn** — бот получает с помощью НБ РБ API текущий курс белорусского рубля и отправляет её вам
 * **!echo** — бот начинает повторять за вами, чтобы это остановить, надо написать *!echo off*
 * **!game *камень/ножницы/бумага/статистика*** — бот играет с вами в "Камень, ножницы, бумага" и ведет статискику игр, которую записывает в файл json
+* **!debug** — бот отправляет информацию о своём состоянии
 
 # Использованные библиотеки
 
