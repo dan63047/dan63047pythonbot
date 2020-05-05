@@ -7,7 +7,9 @@ import pyowm
 import random
 import json
 import asyncio
+import os
 import wikipediaapi as wiki
+from collections import deque
 from config import vk, owm, vk_mda, group_id, album_for_command, owner_id
 from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
@@ -18,7 +20,7 @@ debug_array = {'vk_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'message
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 handler = logging.FileHandler('bot.log', 'w', 'utf-8')
-handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+handler.setFormatter(logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s'))
 root_logger.addHandler(handler)
 
 longpoll = VkBotLongPoll(vk, group_id)
@@ -28,7 +30,7 @@ def log(warning, text):
     if warning:
         logging.warning(text)
         debug_array['logger_warnings'] += 1
-        print("["+time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime())+"][WARNING] "+text)
+        print("[" + time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime()) + "][WARNING] " + text)
     else:
         logging.info(text)
         print("[" + time.strftime("%d.%m.%Y %H:%M:%S", time.gmtime()) + "] " + text)
@@ -104,8 +106,19 @@ class VkBot:
         time_sec = int(up_time) - int(time_min) * 60 - int(time_h) * 3600 - int(time_d) * 24 * 60 * 60
         str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
         datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
-        return "Запуск бота: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S') + " (UPTIME: " + str_up_time + ")<br>Получено сообщений: " + str(debug_array['messages_get']) + " (Отвечено на: " + str(debug_array['messages_answered']) + ")<br>Дисконнектов: " + str(debug_array['vk_warnings']) + "<br>Обьектов бота: " + str(len(bot)) + "<br>Ошибок в работе: " + str(debug_array['logger_warnings'])
-
+        answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
+            debug_array['messages_get']) + " (Отвечено на " + str(
+            debug_array['messages_answered']) + ")<br>Ошибок в работе: " + str(
+            debug_array['logger_warnings']) + " (Из них беды с ВК: " + str(debug_array['vk_warnings']) + ")<br>Обьектов бота: " + str(len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S')
+        if self._OWNER:
+            with open("bot.log", 'r') as f:
+                log = list(deque(f, 10))
+                text_log = "<br>Последние 10 строк из лога:<br>"
+                for i in range(len(log)):
+                    text_log += log[i]
+                f.close()
+            answer += text_log
+        return answer
 
     def game(self, thing):
         if thing == "статистика":
@@ -244,7 +257,7 @@ class VkBot:
         return answer
 
     def random_image(self):
-        group = "-"+str(group_id)
+        group = "-" + str(group_id)
         random_images_query = vk_mda.method('photos.get',
                                             {'owner_id': group, 'album_id': album_for_command, 'count': 1000})
         info = "Результат метода photos.get: Получено " + str(random_images_query['count']) + " фото"
@@ -293,7 +306,7 @@ class VkBot:
 
         elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
             respond[
-                'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 04.05.2020(Внедрение дебаг функции)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+                'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 06.05.2020 (Обновление дебаг функции)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
         elif message[0] == self._COMMANDS[3]:
             try:
