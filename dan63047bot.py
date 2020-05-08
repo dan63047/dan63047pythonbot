@@ -6,15 +6,14 @@ import logging
 import pyowm
 import random
 import json
-import asyncio
-import os
+import threading
 import wikipediaapi as wiki
 from collections import deque
 from config import vk, owm, vk_mda, group_id, album_for_command, owner_id
-from vk_api.longpoll import VkLongPoll, VkEventType
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 bot = {}
+users = []
 debug_array = {'vk_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
 
 root_logger = logging.getLogger()
@@ -75,6 +74,7 @@ class VkBot:
         log(False, f"Создан объект бота! id{peer_id}")
         self._USER_ID = user_id
         self._CHAT_ID = peer_id
+        self._MIDNIGHT_EVENT = False
         self._ECHO_MODE = False
 
         if self._USER_ID == owner_id and self._CHAT_ID <= 2000000000:
@@ -83,42 +83,124 @@ class VkBot:
             self._OWNER = False
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug"]
+                          "!echo", "!game", "!debug", "!midnight"]
 
-    async def get_message(self, message):
+    def event(self, event):
+        if event == "midnight" and self._MIDNIGHT_EVENT:
+            self.send("Миднайт")
+            log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
+
+    def get_message(self, message):
         if self._ECHO_MODE:
             if message == "!echo off":
-                vk.method('messages.send',
-                          {'peer_id': self._CHAT_ID, 'message': "Режим эхо выключен", 'random_id': time.time()})
+                self.send(message)
                 self._ECHO_MODE = False
                 log(False, f"Бот id{self._CHAT_ID} вышел из режима эхо")
+                debug_array['messages_answered'] += 1
             else:
-                vk.method('messages.send', {'peer_id': self._CHAT_ID, 'message': message, 'random_id': time.time()})
+                self.send(message)
                 log(False, f"Эхо-бот id{self._CHAT_ID}: {message}")
+                debug_array['messages_answered'] += 1
         else:
-            await self.send_message(message)
+            respond = {'attachment': None, 'text': None}
+            message = message.split(' ', 1)
+            if message[0] == self._COMMANDS[0]:
+                respond['attachment'] = self.random_image()
 
-    def debug(self):
-        up_time = time.time() - debug_array['start_time']
-        time_d = int(up_time) / (3600 * 24)
-        time_h = int(up_time) / 3600 - int(time_d) * 24
-        time_min = int(up_time) / 60 - int(time_h) * 60 - int(time_d) * 24 * 60
-        time_sec = int(up_time) - int(time_min) * 60 - int(time_h) * 3600 - int(time_d) * 24 * 60 * 60
-        str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
-        datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
-        answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
-            debug_array['messages_get']) + " (Отвечено на " + str(
-            debug_array['messages_answered']) + ")<br>Ошибок в работе: " + str(
-            debug_array['logger_warnings']) + " (Из них беды с ВК: " + str(debug_array['vk_warnings']) + ")<br>Обьектов бота: " + str(len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S')
-        if self._OWNER:
-            with open("bot.log", 'r') as f:
-                log = list(deque(f, 10))
-                text_log = "<br>Последние 10 строк из лога:<br>"
-                for i in range(len(log)):
-                    text_log += log[i]
-                f.close()
-            answer += text_log
-        return answer
+            elif message[0] == self._COMMANDS[1]:
+                respond['text'] = "Ваш ид: " + str(self._USER_ID)
+
+            elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
+                respond[
+                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!h, !help - справка<br>Дата последнего обновления: 08.05.2020 (!midnight и перестройка бота)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+
+            elif message[0] == self._COMMANDS[3]:
+                try:
+                    respond['text'] = self.get_info_user(message[1])
+                except IndexError:
+                    respond['text'] = "Отсуствует аргумент"
+
+            elif message[0] == self._COMMANDS[4]:
+                try:
+                    respond['text'] = self.get_info_group(message[1])
+                except IndexError:
+                    respond['text'] = "Отсуствует аргумент"
+
+            elif message[0] == self._COMMANDS[6]:
+                try:
+                    respond['text'] = get_weather(message[1])
+                except IndexError:
+                    respond['text'] = "Отсуствует аргумент"
+
+            elif message[0] == self._COMMANDS[7]:
+                try:
+                    respond['text'] = self.wiki_article(message[1])
+                except IndexError:
+                    respond['text'] = "Отсуствует аргумент"
+
+            elif message[0] == self._COMMANDS[8]:
+                respond['text'] = self.exchange_rates()
+
+            elif message[0] == self._COMMANDS[9]:
+                vk.method('messages.send', {'peer_id': self._CHAT_ID,
+                                            'message': "Теперь бот работает в режиме эхо. Чтобы"
+                                                       " это выключить, введить \"!echo off\"",
+                                            'random_id': time.time()})
+                self._ECHO_MODE = True
+                log(False, f"Бот id{self._CHAT_ID} в режиме эхо")
+
+            elif message[0] == self._COMMANDS[10]:
+                try:
+                    message[1] = message[1].lower()
+                    respond['text'] = self.game(message[1])
+                except IndexError:
+                    respond['text'] = "Отсуствует аргумент"
+
+            elif message[0] == self._COMMANDS[11]:
+                try:
+                    respond['text'] = self.debug(message[1])
+                except IndexError:
+                    respond['text'] = self.debug()
+
+            elif message[0] == self._COMMANDS[12]:
+                if self._MIDNIGHT_EVENT:
+                    self._MIDNIGHT_EVENT = False
+                    self.send("Уведомление о миднайте выключено")
+                    log(False, f"Бот id{self._CHAT_ID}: Юзер отписался от ивента \"Миднайт\"")
+                else:
+                    self._MIDNIGHT_EVENT = True
+                    self.send("Бот будет уведомлять вас о каждом миднайте")
+                    log(False, f"Бот id{self._CHAT_ID}: Юзер подписался на ивент \"Миднайт\"")
+
+            if respond['text'] or respond['attachment']:
+                self.send(respond['text'], respond['attachment'])
+                debug_array['messages_answered'] += 1
+
+    def debug(self, arg=None):
+        if arg == "log":
+            if self._OWNER:
+                with open("bot.log", 'r') as f:
+                    log = list(deque(f, 10))
+                    text_log = "<br>Последние 10 строк из лога:<br>"
+                    for i in range(len(log)):
+                        text_log += log[i]
+                    f.close()
+                return text_log
+            else:
+                return "Отказано в доступе"
+        else:
+            up_time = time.time() - debug_array['start_time']
+            time_d = int(up_time) / (3600 * 24)
+            time_h = int(up_time) / 3600 - int(time_d) * 24
+            time_min = int(up_time) / 60 - int(time_h) * 60 - int(time_d) * 24 * 60
+            time_sec = int(up_time) - int(time_min) * 60 - int(time_h) * 3600 - int(time_d) * 24 * 60 * 60
+            str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
+            datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
+            answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
+                debug_array['messages_get']) + " (Отвечено на " + str(
+                debug_array['messages_answered']) + ")<br>Ошибок в работе: " + str(
+                debug_array['logger_warnings']) + " (Из них беды с ВК: " + str(debug_array['vk_warnings']) + ")<br>Обьектов бота: " + str(len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
+            return answer
 
     def game(self, thing):
         if thing == "статистика":
@@ -275,7 +357,7 @@ class VkBot:
             answer = "Такой статьи не существует"
         return answer
 
-    async def exchange_rates(self):
+    def exchange_rates(self):
         try:
             rates_USD = json.loads(
                 requests.get("https://www.nbrb.by/api/exrates/rates/145?periodicity=0", timeout=10).text)
@@ -295,89 +377,43 @@ class VkBot:
             log(True, err)
             return "Невозможно получить данные из НБ РБ: " + str(mda)
 
-    async def send_message(self, message):
-        respond = {'attachment': None, 'text': None}
-        message = message.split(' ', 1)
-        if message[0] == self._COMMANDS[0]:
-            respond['attachment'] = self.random_image()
+    def send(self, message=None, attachment=None):
+        message = vk.method('messages.send',
+                            {'peer_id': self._CHAT_ID, 'message': message, 'random_id': time.time(),
+                             'attachment': attachment})
+        log(False, f'Бот id{self._CHAT_ID}: Ответ метода ВК "messages.send": {message}')
 
-        elif message[0] == self._COMMANDS[1]:
-            respond['text'] = "Ваш ид: " + str(self._USER_ID)
-
-        elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
-            respond[
-                'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!h, !help - справка<br>Дата последнего обновления: 06.05.2020 (Обновление дебаг функции)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
-
-        elif message[0] == self._COMMANDS[3]:
-            try:
-                respond['text'] = self.get_info_user(message[1])
-            except IndexError:
-                respond['text'] = "Отсуствует аргумент"
-
-        elif message[0] == self._COMMANDS[4]:
-            try:
-                respond['text'] = self.get_info_group(message[1])
-            except IndexError:
-                respond['text'] = "Отсуствует аргумент"
-
-        elif message[0] == self._COMMANDS[6]:
-            try:
-                respond['text'] = get_weather(message[1])
-            except IndexError:
-                respond['text'] = "Отсуствует аргумент"
-
-        elif message[0] == self._COMMANDS[7]:
-            try:
-                respond['text'] = self.wiki_article(message[1])
-            except IndexError:
-                respond['text'] = "Отсуствует аргумент"
-
-        elif message[0] == self._COMMANDS[8]:
-            respond['text'] = await self.exchange_rates()
-
-        elif message[0] == self._COMMANDS[9]:
-            vk.method('messages.send', {'peer_id': self._CHAT_ID,
-                                        'message': "Теперь бот работает в режиме эхо. Чтобы"
-                                                   " это выключить, введить \"!echo off\"",
-                                        'random_id': time.time()})
-            self._ECHO_MODE = True
-            log(False, f"Бот id{self._CHAT_ID} в режиме эхо")
-
-        elif message[0] == self._COMMANDS[10]:
-            try:
-                message[1] = message[1].lower()
-                respond['text'] = self.game(message[1])
-            except IndexError:
-                respond['text'] = "Отсуствует аргумент"
-
-        elif message[0] == self._COMMANDS[11]:
-            respond['text'] = self.debug()
-
-        if respond['text'] or respond['attachment']:
-            message = vk.method('messages.send',
-                                {'peer_id': self._CHAT_ID, 'message': respond['text'], 'random_id': time.time(),
-                                 'attachment': respond['attachment']})
-            debug_array['messages_answered'] += 1
-            log(False, f'Ответ бота в чат id{self._CHAT_ID}: {respond}')
-
-
-async def main():
+def bots():
     for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
-                log(False, f'Новое сообщение в чате id{event.message.peer_id}: {event.message.text}')
+                log(False, f'Новое сообщение: {event.message}')
                 debug_array['messages_get'] += 1
                 if event.message.peer_id in bot:
-                    await bot[event.message.peer_id].get_message(event.message.text)
+                    bot[event.message.peer_id].get_message(event.message.text)
                 else:
                     bot[event.message.peer_id] = VkBot(event.message.peer_id, event.message.from_id)
-                    await bot[event.message.peer_id].get_message(event.message.text)
+                    users.append(event.message.peer_id)
+                    bot[event.message.peer_id].get_message(event.message.text)
         except Exception as kek:
             err = "Беды с ботом: " + str(kek)
             log(True, err)
             continue
 
 
+def midnight():
+    while True:
+        if time.time()+10800 % 86400 == 0:
+            for i in users:
+                log(False, "Иницаилизация ивента \"Миднайт\"")
+                bot[i].event("midnight")
+
+
+tread_bots = threading.Thread(target=bots)
+tread_midnight = threading.Thread(target=midnight)
+tread_bots.start()
 log(False, "Бот начал работу")
 debug_array['start_time'] = time.time()
-asyncio.run(main())
+tread_midnight.start()
+
+
