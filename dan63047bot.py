@@ -111,7 +111,26 @@ class VkBot:
     def event(self, event):
         if event == "midnight" and self._MIDNIGHT_EVENT:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
-            self.send(f"Миднайт!<br>Наступило {current_time.strftime('%d.%m.%Y')}")
+
+            midnight_text = ["Мидннайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!"]
+            midnight_after = ["Ложись спать!", "P E A C E  A N D  T R A N Q U I L I T Y", "Поиграй в майнкрафт",
+                              "Втыкай в ВК дальше", "hat in time is gay", "R34 по ахиту это смертный грех"]
+            midnight_pre_check_it = ["Зацени", "Чекни"]
+            midnight_check_it = ["альбом \"Cosmic Gate presents Wake Your Mind Sessions 004\"",
+                                 "альбом \"Moons Of Jupiter\" от Gaia",
+                                 "альбом \"Interplay 2019\" от Александра Попова",
+                                 "последний эпизод \"A State Of Trance\" от Armin van Buuren",
+                                 "последний эпизод \"CLUBLIFE\" от Tiësto",
+                                 "последний эпизод \"Group Therapy\" от Above & Beyond"]
+
+            midnight_output = random.choice(midnight_text) + "<br>" + f"Наступило {current_time.strftime('%d.%m.%Y')}<br><br>"
+            random_thing = random.randint(0, 1)
+            if random_thing:
+                midnight_output += random.choice(midnight_after)
+            else:
+                midnight_output += random.choice(midnight_pre_check_it) + " " + random.choice(midnight_check_it)
+
+            self.send(midnight_output)
             log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
 
     def get_message(self, message):
@@ -438,6 +457,7 @@ def midnight():
             log(False, "Иницаилизация ивента \"Миднайт\"")
             for i in users:
                 bot[int(i)].event("midnight")
+            log(False, "Ивент \"Миднайт\" завершён")
             time.sleep(1)
         else:
             time.sleep(0.50)
