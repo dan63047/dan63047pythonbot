@@ -13,7 +13,7 @@ from config import vk, owm, vk_mda, group_id, album_for_command, owner_id
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 bot = {}
-users = []
+users = {}
 debug_array = {'vk_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
 
 root_logger = logging.getLogger()
@@ -23,6 +23,26 @@ handler.setFormatter(logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s
 root_logger.addHandler(handler)
 
 longpoll = VkBotLongPoll(vk, group_id)
+
+
+def update_users_json(massive):
+    with open("users.json", 'w') as write_file:
+        data = massive
+        json.dump(data, write_file)
+        write_file.close()
+
+
+def load_users():
+    try:
+        with open("users.json", 'r') as users_file:
+            users_not_json = json.load(users_file)
+            for i in users_not_json:
+                users[i] = users_not_json[i]
+            users_file.close()
+        for i in users:
+            bot[int(i)] = VkBot(i, users[i]["midnight"])
+    except Exception as lol:
+        log(True, f"Проблема с загрузкой users.json: {str(lol)}")
 
 
 def log(warning, text):
@@ -69,15 +89,18 @@ def get_weather(place):
 
 class VkBot:
 
-    def __init__(self, peer_id, user_id):
+    def __init__(self, peer_id, midnight=False):
 
         log(False, f"Создан объект бота! id{peer_id}")
-        self._USER_ID = user_id
         self._CHAT_ID = peer_id
-        self._MIDNIGHT_EVENT = False
         self._ECHO_MODE = False
+        
+        if midnight:
+            self._MIDNIGHT_EVENT = True
+        else:
+            self._MIDNIGHT_EVENT = False
 
-        if self._USER_ID == owner_id and self._CHAT_ID <= 2000000000:
+        if self._CHAT_ID == owner_id:
             self._OWNER = True
         else:
             self._OWNER = False
@@ -87,7 +110,8 @@ class VkBot:
 
     def event(self, event):
         if event == "midnight" and self._MIDNIGHT_EVENT:
-            self.send("Миднайт")
+            current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
+            self.send(f"Миднайт!<br>Наступило {current_time.strftime('%d.%m.%Y')}")
             log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
 
     def get_message(self, message):
@@ -108,7 +132,7 @@ class VkBot:
                 respond['attachment'] = self.random_image()
 
             elif message[0] == self._COMMANDS[1]:
-                respond['text'] = "Ваш ид: " + str(self._USER_ID)
+                respond['text'] = "Ваш ид: " + str(self._CHAT_ID)
 
             elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
                 respond[
@@ -171,6 +195,8 @@ class VkBot:
                     self._MIDNIGHT_EVENT = True
                     self.send("Бот будет уведомлять вас о каждом миднайте")
                     log(False, f"Бот id{self._CHAT_ID}: Юзер подписался на ивент \"Миднайт\"")
+                users[self._CHAT_ID]["midnight"] = self._MIDNIGHT_EVENT
+                update_users_json(users)
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
@@ -206,9 +232,9 @@ class VkBot:
         if thing == "статистика":
             with open("data_file.json", "r") as read_file:
                 data = json.load(read_file)
-                if str(self._USER_ID) in data:
-                    winrate = (data[str(self._USER_ID)]['wins'] / data[str(self._USER_ID)]['games']) * 100
-                    return f"Камень, ножницы, бумага<br>Сыграно игр: {data[str(self._USER_ID)]['games']}<br>Из них:<br>•Побед: {data[str(self._USER_ID)]['wins']}<br>•Поражений: {data[str(self._USER_ID)]['defeats']}<br>•Ничей: {data[str(self._USER_ID)]['draws']}<br>Процент побед: {toFixed(winrate, 2)}%"
+                if str(self._CHAT_ID) in data:
+                    winrate = (data[str(self._CHAT_ID)]['wins'] / data[str(self._CHAT_ID)]['games']) * 100
+                    return f"Камень, ножницы, бумага<br>Сыграно игр: {data[str(self._CHAT_ID)]['games']}<br>Из них:<br>•Побед: {data[str(self._CHAT_ID)]['wins']}<br>•Поражений: {data[str(self._CHAT_ID)]['defeats']}<br>•Ничей: {data[str(self._CHAT_ID)]['draws']}<br>Процент побед: {toFixed(winrate, 2)}%"
                 else:
                     return "Похоже, вы ещё никогда не играли в Камень, ножницы, бумага"
         elif thing == "камень" or thing == "ножницы" or thing == "бумага":
@@ -245,22 +271,22 @@ class VkBot:
                     data = json.load(write_file)
                 except Exception:
                     data = {}
-                if str(self._USER_ID) not in data:
-                    data[str(self._USER_ID)] = {}
-                    data[str(self._USER_ID)]["games"] = 0
-                    data[str(self._USER_ID)]["wins"] = 0
-                    data[str(self._USER_ID)]["defeats"] = 0
-                    data[str(self._USER_ID)]["draws"] = 0
+                if str(self._CHAT_ID) not in data:
+                    data[str(self._CHAT_ID)] = {}
+                    data[str(self._CHAT_ID)]["games"] = 0
+                    data[str(self._CHAT_ID)]["wins"] = 0
+                    data[str(self._CHAT_ID)]["defeats"] = 0
+                    data[str(self._CHAT_ID)]["draws"] = 0
 
                 if result == 2:
-                    data[str(self._USER_ID)]["games"] += 1
-                    data[str(self._USER_ID)]["wins"] += 1
+                    data[str(self._CHAT_ID)]["games"] += 1
+                    data[str(self._CHAT_ID)]["wins"] += 1
                 elif result == 1:
-                    data[str(self._USER_ID)]["games"] += 1
-                    data[str(self._USER_ID)]["defeats"] += 1
+                    data[str(self._CHAT_ID)]["games"] += 1
+                    data[str(self._CHAT_ID)]["defeats"] += 1
                 elif result == 0:
-                    data[str(self._USER_ID)]["games"] += 1
-                    data[str(self._USER_ID)]["draws"] += 1
+                    data[str(self._CHAT_ID)]["games"] += 1
+                    data[str(self._CHAT_ID)]["draws"] += 1
 
                 with open("data_file.json", "w") as write_file:
                     json.dump(data, write_file)
@@ -382,18 +408,22 @@ class VkBot:
                             {'peer_id': self._CHAT_ID, 'message': message, 'random_id': time.time(),
                              'attachment': attachment})
         log(False, f'Бот id{self._CHAT_ID}: Ответ метода ВК "messages.send": {message}')
+        
 
 def bots():
+    log(False, "Бот начал работу")
+    debug_array['start_time'] = time.time()
     for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 log(False, f'Новое сообщение: {event.message}')
                 debug_array['messages_get'] += 1
-                if event.message.peer_id in bot:
+                if int(event.message.peer_id) in bot:
                     bot[event.message.peer_id].get_message(event.message.text)
                 else:
-                    bot[event.message.peer_id] = VkBot(event.message.peer_id, event.message.from_id)
-                    users.append(event.message.peer_id)
+                    bot[event.message.peer_id] = VkBot(event.message.peer_id)
+                    users[event.message.peer_id] = {"midnight": False}
+                    update_users_json(users)
                     bot[event.message.peer_id].get_message(event.message.text)
         except Exception as kek:
             err = "Беды с ботом: " + str(kek)
@@ -403,17 +433,21 @@ def bots():
 
 def midnight():
     while True:
-        if time.time()+10800 % 86400 == 0:
+        current_time = time.time()+10800
+        if int(current_time) % 86400 == 0:
+            log(False, "Иницаилизация ивента \"Миднайт\"")
             for i in users:
-                log(False, "Иницаилизация ивента \"Миднайт\"")
-                bot[i].event("midnight")
+                bot[i.chat].event("midnight")
+            time.sleep(1)
+        else:
+            time.sleep(0.50)
 
 
+log(False, "Скрипт запущен, чтение users.json для восстановления обьектов ботов")
+load_users()
 tread_bots = threading.Thread(target=bots)
 tread_midnight = threading.Thread(target=midnight)
 tread_bots.start()
-log(False, "Бот начал работу")
-debug_array['start_time'] = time.time()
 tread_midnight.start()
 
 
