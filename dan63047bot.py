@@ -94,19 +94,20 @@ class VkBot:
         log(False, f"Создан объект бота! id{peer_id}")
         self._CHAT_ID = peer_id
         self._ECHO_MODE = False
+        self._ACCESS_LEVEL = 1
         
         if midnight:
             self._MIDNIGHT_EVENT = True
         else:
             self._MIDNIGHT_EVENT = False
 
-        if self._CHAT_ID == owner_id:
+        if int(self._CHAT_ID) == int(owner_id):
             self._OWNER = True
         else:
             self._OWNER = False
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight"]
+                          "!echo", "!game", "!debug", "!midnight", "!access"]
 
     def event(self, event):
         if event == "midnight" and self._MIDNIGHT_EVENT:
@@ -124,16 +125,18 @@ class VkBot:
                                  "последний эпизод \"Group Therapy\" от Above & Beyond"]
 
             midnight_output = random.choice(midnight_text) + "<br>" + f"Наступило {current_time.strftime('%d.%m.%Y')}<br><br>"
-            random_thing = random.randint(0, 1)
-            if random_thing:
+            random_thing = random.randint(0, 2)
+            if random_thing == 0:
                 midnight_output += random.choice(midnight_after)
-            else:
+            elif random_thing == 1:
                 midnight_output += random.choice(midnight_pre_check_it) + " " + random.choice(midnight_check_it)
+            elif random_thing == 2:
+                midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
             self.send(midnight_output)
             log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
 
-    def get_message(self, message):
+    def get_message(self, message, user_id):
         if self._ECHO_MODE:
             if message == "!echo off":
                 self.send(message)
@@ -200,22 +203,44 @@ class VkBot:
                     respond['text'] = "Отсуствует аргумент"
 
             elif message[0] == self._COMMANDS[11]:
-                try:
-                    respond['text'] = self.debug(message[1])
-                except IndexError:
-                    respond['text'] = self.debug()
+                if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
+                    try:
+                        respond['text'] = self.debug(message[1])
+                    except IndexError:
+                        respond['text'] = self.debug()
+                else:
+                    respond["text"] = "Отказано в доступе"
 
             elif message[0] == self._COMMANDS[12]:
-                if self._MIDNIGHT_EVENT:
-                    self._MIDNIGHT_EVENT = False
-                    self.send("Уведомление о миднайте выключено")
-                    log(False, f"Бот id{self._CHAT_ID}: Юзер отписался от ивента \"Миднайт\"")
+                if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
+                    if self._MIDNIGHT_EVENT:
+                        self._MIDNIGHT_EVENT = False
+                        self.send("Уведомление о миднайте выключено")
+                        log(False, f"Бот id{self._CHAT_ID}: Юзер отписался от ивента \"Миднайт\"")
+                    else:
+                        self._MIDNIGHT_EVENT = True
+                        self.send("Бот будет уведомлять вас о каждом миднайте")
+                        log(False, f"Бот id{self._CHAT_ID}: Юзер подписался на ивент \"Миднайт\"")
+                    users[self._CHAT_ID]["midnight"] = self._MIDNIGHT_EVENT
+                    update_users_json(users)
                 else:
-                    self._MIDNIGHT_EVENT = True
-                    self.send("Бот будет уведомлять вас о каждом миднайте")
-                    log(False, f"Бот id{self._CHAT_ID}: Юзер подписался на ивент \"Миднайт\"")
-                users[self._CHAT_ID]["midnight"] = self._MIDNIGHT_EVENT
-                update_users_json(users)
+                    respond['text'] = "Отказано в доступе"
+
+            elif message[0] == self._COMMANDS[13]:
+                if int(user_id) == int(owner_id):
+                    try:
+                        if message[1] == "owner":
+                            respond['text'] = "Теперь некоторыми командами может пользоваться только владелец бота"
+                            self._ACCESS_LEVEL = 0
+                        elif message[1] == "all":
+                            respond['text'] = "Теперь все могут пользоваться всеми командами"
+                            self._ACCESS_LEVEL = 1
+                        else:
+                            respond['text'] = "Некорректный аргумент"
+                    except IndexError:
+                        respond['text'] = "Отсуствует аргумент"
+                else:
+                    respond['text'] = "Отказано в доступе"
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
@@ -438,12 +463,12 @@ def bots():
                 log(False, f'Новое сообщение: {event.message}')
                 debug_array['messages_get'] += 1
                 if int(event.message.peer_id) in bot:
-                    bot[event.message.peer_id].get_message(event.message.text)
+                    bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
                 else:
                     bot[event.message.peer_id] = VkBot(event.message.peer_id)
                     users[event.message.peer_id] = {"midnight": False}
                     update_users_json(users)
-                    bot[event.message.peer_id].get_message(event.message.text)
+                    bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
         except Exception as kek:
             err = "Беды с ботом: " + str(kek)
             log(True, err)
