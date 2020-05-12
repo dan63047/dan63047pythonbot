@@ -129,8 +129,8 @@ class VkBot:
             elif random_thing == 2:
                 midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
-            self.send(midnight_output)
-            log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте", image)
+            self.send(midnight_output, image)
+            log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
 
     def get_message(self, message, user_id):
         if self._ECHO_MODE:
