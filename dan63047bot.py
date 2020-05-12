@@ -112,29 +112,25 @@ class VkBot:
     def event(self, event):
         if event == "midnight" and self._MIDNIGHT_EVENT:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
+            image = None
 
             midnight_text = ["Мидннайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!"]
             midnight_after = ["Ложись спать!", "P E A C E  A N D  T R A N Q U I L I T Y", "Поиграй в майнкрафт",
-                              "Втыкай в ВК дальше", "hat in time is gay", "R34 по ахиту это смертный грех", "Egg"]
-            midnight_pre_check_it = ["Зацени", "Чекни"]
-            midnight_check_it = ["альбом \"Cosmic Gate presents Wake Your Mind Sessions 004\"",
-                                 "альбом \"Moons Of Jupiter\" от Gaia",
-                                 "альбом \"Interplay 2019\" от Александра Попова",
-                                 "последний эпизод \"A State Of Trance\" от Armin van Buuren",
-                                 "последний эпизод \"CLUBLIFE\" от Tiësto",
-                                 "последний эпизод \"Group Therapy\" от Above & Beyond"]
+                              "Втыкай в ВК дальше", "hat in time is gay", "R34 по ахиту это смертный грех", "Egg",
+                              "вещ или бан", "Мой ник в игре _ичё"]
 
             midnight_output = random.choice(midnight_text) + "<br>" + f"Наступило {current_time.strftime('%d.%m.%Y')}<br><br>"
             random_thing = random.randint(0, 2)
             if random_thing == 0:
                 midnight_output += random.choice(midnight_after)
             elif random_thing == 1:
-                midnight_output += random.choice(midnight_pre_check_it) + " " + random.choice(midnight_check_it)
+                midnight_output += "Картинка дня:"
+                image = self.random_image()
             elif random_thing == 2:
                 midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
 
             self.send(midnight_output)
-            log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
+            log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте", image)
 
     def get_message(self, message, user_id):
         if self._ECHO_MODE:
