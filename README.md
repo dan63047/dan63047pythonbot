@@ -45,6 +45,7 @@ owm = pyowm.OWM('OpenWeather_api_key', language='ru') # Ключ OpenWeather API
 * [vk_api](https://github.com/python273/vk_api) — модуль для создания скриптов для социальной сети Вконтакте
 * [pyowm](https://github.com/csparpa/pyowm) — модуль для получения погоды через OpenWeather API
 * [Wikipedia-API](https://github.com/martin-majlis/Wikipedia-API) — модуль для получения статей из Wikipedia
+* [Pillow](https://github.com/python-pillow/Pillow) — Python Imaging Library fork
 
 # Дополнительно
 
