@@ -9,6 +9,9 @@ import json
 import threading
 import wikipediaapi as wiki
 from collections import deque
+
+from PIL import Image
+
 from config import vk, owm, vk_mda, group_id, album_for_command, owner_id
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
@@ -136,7 +139,14 @@ class VkBot:
                 midnight_output += "Картинка дня:"
                 image = self.random_image()
             elif random_thing == 2:
-                midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+                R = random.randint(0, 255)
+                G = random.randint(0, 255)
+                B = random.randint(0, 255)
+                random_color_image = Image.new("RGB", (512, 512), (R, G, B))
+                random_color_image.save("randomcolor.jpg")
+                what_send = vk_api.upload.VkUpload(vk).photo_messages("randomcolor.jpg", peer_id=self._CHAT_ID)
+                image = "photo" + str(what_send[0]['owner_id']) + "_" + str(what_send[0]['id'])
+                midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (R, G, B)
 
             self.send(midnight_output, image)
             log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
@@ -144,29 +154,27 @@ class VkBot:
     def get_message(self, message, user_id):
         if self._ECHO_MODE:
             if message == "!echo off":
-                self.send(message)
+                self.send("Эхо режим выключен")
                 self._ECHO_MODE = False
                 log(False, f"Бот id{self._CHAT_ID} вышел из режима эхо")
             else:
                 self.send(message)
                 log(False, f"Эхо-бот id{self._CHAT_ID}: {message}")
         elif self._AWAITING_INPUT_MODE:
-            if self._AWAITING_INPUT_MODE == "reminder task":
-                if message == "Назад":
-                    self._AWAITING_INPUT_MODE = None
-                    self.send("Установка напоминания отменена")
-                else:
+            if message == "Назад":
+                self._AWAITING_INPUT_MODE = None
+                self.send("Установка напоминания отменена")
+            else:
+                if self._AWAITING_INPUT_MODE == "reminder task":
                     self.reminder(message, "task")
-                    self.send('Когда напомнить?')
+                    self.send('Когда напомнить? (время в формате дд.мм.гг чч:мм)')
                     self._AWAITING_INPUT_MODE = 'reminder time'
-            elif self._AWAITING_INPUT_MODE == 'reminder time':
-                if message == "Назад":
-                    self._AWAITING_INPUT_MODE = None
-                    self.send("Установка напоминания отменена")
-                else:
-                    self.reminder(message, "time")
-                    self.send("Напоминание установлено")
-                    self._AWAITING_INPUT_MODE = None
+                elif self._AWAITING_INPUT_MODE == 'reminder time':
+                    if self.reminder(message, "time"):
+                        self.send("Напоминание установлено")
+                        self._AWAITING_INPUT_MODE = None
+                    else:
+                        self.send("Неверный формат времени, введите время в формате дд.мм.гг чч:мм")
         else:
             respond = {'attachment': None, 'text': None}
             message = message.split(' ', 1)
@@ -178,7 +186,7 @@ class VkBot:
 
             elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
                 respond[
-                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!h, !help - справка<br>Дата последнего обновления: 16.05.2020 (обновление команды !midnight)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!h, !help - справка<br>Дата последнего обновления: 20.05.2020 (обновление команды !midnight)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
             elif message[0] == self._COMMANDS[3]:
                 try:
@@ -319,8 +327,15 @@ class VkBot:
         set_up = {"task": None, "time": None}
         if stage == "task":
             set_up['task'] = string
+            return True
         elif stage == "time":
-            pass
+            try:
+                datetime_object = time.strptime(string, '%d.%m.%y %H:%M')
+                set_up['time'] = time.mktime(datetime_object)
+                return True
+            except ValueError:
+                return False
+
 
 
     def game(self, thing):
