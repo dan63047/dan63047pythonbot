@@ -44,7 +44,7 @@ def load_users():
                 users[i] = users_not_json[i]
             users_file.close()
         for i in users:
-            bot[int(i)] = VkBot(i, users[i]["midnight"])
+            bot[int(i)] = VkBot(i, users[i]["midnight"], users[i]['await'], int(users[i]['access']))
     except Exception as lol:
         log(True, f"Проблема с загрузкой users.json: {str(lol)}")
 
@@ -93,13 +93,13 @@ def get_weather(place):
 
 class VkBot:
 
-    def __init__(self, peer_id, midnight=False):
+    def __init__(self, peer_id, midnight=False, awaiting=None, access=1):
 
         log(False, f"Создан объект бота! id{peer_id}")
         self._CHAT_ID = peer_id
-        self._ECHO_MODE = False
-        self._AWAITING_INPUT_MODE = None
-        self._ACCESS_LEVEL = 1
+        self._AWAITING_INPUT_MODE = awaiting
+        self._ACCESS_LEVEL = access
+        self._SET_UP_REMINDER = {"task": None, "time": None}
         
         if midnight:
             self._MIDNIGHT_EVENT = True
@@ -115,7 +115,7 @@ class VkBot:
                           "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder"]
 
     def __str__(self):
-        return f"Чат id{str(self._CHAT_ID)}, миднайт: {str(self._MIDNIGHT_EVENT)}, ожидание: {str(self._AWAITING_INPUT_MODE)}, эхо: {str(self._ECHO_MODE)}"
+        return f"peer_id: {str(self._CHAT_ID)}, m: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, tasks: {len(users[self._CHAT_ID]['tasks'])}"
 
     def __del__(self):
         log(False, f"Бот id{str(self._CHAT_ID)} удалён")
@@ -129,7 +129,7 @@ class VkBot:
             midnight_after = ["Ложись спать!", "P E A C E  A N D  T R A N Q U I L I T Y", "Поиграй в майнкрафт",
                               "Втыкай в ВК дальше", "hat in time is gay", "RIP 2013-2019 Gears for Breakfast", "Egg",
                               "вещ или бан", "Мой ник в игре _ичё", "Я жил, но что-то пошло не так",
-                              "Когда тебе похуй, ты неувязвим"]
+                              "Когда тебе похуй, ты неувязвим", "Who's Afraid Of 138?!"]
 
             midnight_output = random.choice(midnight_text) + "<br>" + f"Наступило {current_time.strftime('%d.%m.%Y')}<br><br>"
             random_thing = random.randint(0, 2)
@@ -152,29 +152,35 @@ class VkBot:
             log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
 
     def get_message(self, message, user_id):
-        if self._ECHO_MODE:
-            if message == "!echo off":
-                self.send("Эхо режим выключен")
-                self._ECHO_MODE = False
-                log(False, f"Бот id{self._CHAT_ID} вышел из режима эхо")
-            else:
-                self.send(message)
-                log(False, f"Эхо-бот id{self._CHAT_ID}: {message}")
-        elif self._AWAITING_INPUT_MODE:
+        if self._AWAITING_INPUT_MODE:
             if message == "Назад":
-                self._AWAITING_INPUT_MODE = None
-                self.send("Установка напоминания отменена")
+                self.change_await()
+                self.send("Отменено")
             else:
                 if self._AWAITING_INPUT_MODE == "reminder task":
                     self.reminder(message, "task")
                     self.send('Когда напомнить? (время в формате дд.мм.гг чч:мм)')
-                    self._AWAITING_INPUT_MODE = 'reminder time'
+                    self.change_await('reminder time')
                 elif self._AWAITING_INPUT_MODE == 'reminder time':
                     if self.reminder(message, "time"):
                         self.send("Напоминание установлено")
-                        self._AWAITING_INPUT_MODE = None
+                        self.change_await()
                     else:
                         self.send("Неверный формат времени, введите время в формате дд.мм.гг чч:мм")
+                elif self._AWAITING_INPUT_MODE == "reminder delete":
+                    if self.reminder(message, "delete"):
+                        self.send("Напоминание удалено")
+                        self.change_await()
+                    else:
+                        self.send("Нет такого напоминания")
+                elif self._AWAITING_INPUT_MODE == "echo":
+                    if message == "!echo off":
+                        self.send("Эхо режим выключен")
+                        self.change_await()
+                        log(False, f"Бот id{self._CHAT_ID} вышел из режима эхо")
+                    else:
+                        self.send(message)
+                        log(False, f"Эхо-бот id{self._CHAT_ID}: {message}")
         else:
             respond = {'attachment': None, 'text': None}
             message = message.split(' ', 1)
@@ -182,11 +188,11 @@ class VkBot:
                 respond['attachment'] = self.random_image()
 
             elif message[0] == self._COMMANDS[1]:
-                respond['text'] = "Ваш ид: " + str(self._CHAT_ID)
+                respond['text'] = "Ваш ид: " + str(user_id)
 
             elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
                 respond[
-                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!h, !help - справка<br>Дата последнего обновления: 20.05.2020 (обновление команды !midnight)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!reminder *set/list/delete* - напоминалка. set устанавливает напоминание, delete удаляет, list выдаёт список ваших напоминаний<br>!h, !help - справка<br>Дата последнего обновления: 21.05.2020 (!reminder)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
             elif message[0] == self._COMMANDS[3]:
                 try:
@@ -216,11 +222,8 @@ class VkBot:
                 respond['text'] = self.exchange_rates()
 
             elif message[0] == self._COMMANDS[9]:
-                vk.method('messages.send', {'peer_id': self._CHAT_ID,
-                                            'message': "Теперь бот работает в режиме эхо. Чтобы"
-                                                       " это выключить, введить \"!echo off\"",
-                                            'random_id': time.time()})
-                self._ECHO_MODE = True
+                respond['text'] = "Теперь бот работает в режиме эхо. Чтобы это выключить, введить \"!echo off\""
+                self.change_await("echo")
                 log(False, f"Бот id{self._CHAT_ID} в режиме эхо")
 
             elif message[0] == self._COMMANDS[10]:
@@ -259,10 +262,10 @@ class VkBot:
                     try:
                         if message[1] == "owner":
                             respond['text'] = "Теперь некоторыми командами может пользоваться только владелец бота"
-                            self._ACCESS_LEVEL = 0
+                            self.change_access(0)
                         elif message[1] == "all":
                             respond['text'] = "Теперь все могут пользоваться всеми командами"
-                            self._ACCESS_LEVEL = 1
+                            self.change_access(1)
                         else:
                             respond['text'] = "Некорректный аргумент"
                     except IndexError:
@@ -278,10 +281,16 @@ class VkBot:
             elif message[0] == self._COMMANDS[15]:
                 try:
                     if message[1] == "list":
-                        self.send("Напоминания")
+                        respond['text'] = self.reminder(None, "list")
                     elif message[1] == "set":
-                        self.send("О чём мне вам напомнить?")
-                        self._AWAITING_INPUT_MODE = "reminder task"
+                        self.send("О чём мне вам напомнить? (Введите \"Назад\", чтобы отменить установку)")
+                        self.change_await("reminder task")
+                    elif message[1] == "delete":
+                        if len(users[self._CHAT_ID]['tasks']) == 0:
+                            respond["text"] = "У вас не установлено ни одно напоминание"
+                        else:
+                            self.send(f"Введите название напоминания, которое необходимо удалить или \"Назад\", чтобы отменить удаление<br>{self.reminder(None, 'list')}")
+                            self.change_await("reminder delete")
                 except IndexError:
                     respond["text"] = errors_array['miss_argument']
 
@@ -308,7 +317,6 @@ class VkBot:
                 return answer
             else:
                 return errors_array["access"]
-
         else:
             up_time = time.time() - debug_array['start_time']
             time_d = int(up_time) / (3600 * 24)
@@ -318,25 +326,48 @@ class VkBot:
             str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
             datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
             answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
-                debug_array['messages_get']) + " (Отвечено на " + str(
+                debug_array['messages_get']) + " (Отправлено " + str(
                 debug_array['messages_answered']) + ")<br>Ошибок в работе: " + str(
                 debug_array['logger_warnings']) + " (Из них беды с ВК: " + str(debug_array['vk_warnings']) + ")<br>Обьектов бота: " + str(len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
             return answer
 
     def reminder(self, string, stage):
-        set_up = {"task": None, "time": None}
         if stage == "task":
-            set_up['task'] = string
+            self._SET_UP_REMINDER['task'] = string
             return True
         elif stage == "time":
             try:
                 datetime_object = time.strptime(string, '%d.%m.%y %H:%M')
-                set_up['time'] = time.mktime(datetime_object)
+                self._SET_UP_REMINDER['time'] = int(time.mktime(datetime_object))
+                try:
+                    users[self._CHAT_ID]['tasks'][self._SET_UP_REMINDER['time']] = self._SET_UP_REMINDER['task']
+                except KeyError:
+                    users[self._CHAT_ID].setdefault("tasks", {})
+                    users[self._CHAT_ID]['tasks'][self._SET_UP_REMINDER['time']] = self._SET_UP_REMINDER['task']
+                update_users_json(users)
+                log(False, f"Бот id{self._CHAT_ID}: Установлено новое напоминание")
                 return True
             except ValueError:
                 return False
-
-
+        elif stage == "remind":
+            self.send(f"Пришло время вам напомнить: {string}")
+            log(False, f"Бот id{self._CHAT_ID}: Напоминание сработало")
+            return True
+        elif stage == "list":
+            if len(users[self._CHAT_ID]['tasks']) == 0:
+                respond = "У вас не установлено ни одно напоминание"
+            else:
+                respond = 'Установленные напоминания:<br>'
+                for i in users[self._CHAT_ID]['tasks']:
+                    datetime_time = datetime.datetime.fromtimestamp(int(i)+10800)
+                    respond += f"<br>{datetime_time.strftime('%d.%m.%y %H:%M')} - {users[self._CHAT_ID]['tasks'][i]}"
+            return respond
+        elif stage == "delete":
+            for i in users[self._CHAT_ID]['tasks']:
+                    if users[self._CHAT_ID]['tasks'][i] == string:
+                        users[self._CHAT_ID]['tasks'].pop(i)
+                        return True
+            return False
 
     def game(self, thing):
         if thing == "статистика":
@@ -513,6 +544,24 @@ class VkBot:
             log(True, err)
             return "Невозможно получить данные из НБ РБ: " + str(mda)
 
+    def change_await(self, awaiting=None):
+        self._AWAITING_INPUT_MODE = awaiting
+        try:
+            users[self._CHAT_ID]['await']= self._AWAITING_INPUT_MODE
+        except KeyError:
+            users[self._CHAT_ID].setdefault("tasks", None)
+            users[self._CHAT_ID]['await']= self._AWAITING_INPUT_MODE
+        update_users_json(users)
+    
+    def change_access(self, level):
+        self._ACCESS_LEVEL = level
+        try:
+            users[self._CHAT_ID]['access']= self._ACCESS_LEVEL
+        except KeyError:
+            users[self._CHAT_ID].setdefault("tasks", None)
+            users[self._CHAT_ID]['access']= self._ACCESS_LEVEL
+        update_users_json(users)
+
     def send(self, message=None, attachment=None):
         message = vk.method('messages.send',
                             {'peer_id': self._CHAT_ID, 'message': message, 'random_id': time.time(),
@@ -533,7 +582,7 @@ def bots():
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
                 else:
                     bot[event.message.peer_id] = VkBot(event.message.peer_id)
-                    users[event.message.peer_id] = {"midnight": False}
+                    users[event.message.peer_id] = {"midnight": False, "tasks": {}, "await": None, "access": 1}
                     update_users_json(users)
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
         except Exception as kek:
@@ -554,12 +603,33 @@ def midnight():
         else:
             time.sleep(0.50)
 
+def check_tasks():
+    while True:
+        try:
+            for i in users:
+                current_time = time.time()+10800
+                if "tasks" in users[i]:
+                    try:
+                        for n in users[i]["tasks"]:
+                            if int(n) == int(current_time):
+                                bot[int(i)].reminder(users[i]['tasks'][n], "remind")
+                                users[i]['tasks'].pop(n)
+                                update_users_json(users)
+                    except RuntimeError:
+                        continue
+        except RuntimeError:
+            continue
+        time.sleep(0.3)
+            
+
 
 log(False, "Скрипт запущен, чтение users.json для восстановления обьектов ботов")
 load_users()
 tread_bots = threading.Thread(target=bots)
 tread_midnight = threading.Thread(target=midnight)
+tread_tasks = threading.Thread(target=check_tasks)
 tread_bots.start()
 tread_midnight.start()
+tread_tasks.start()
 
 
