@@ -144,8 +144,12 @@ class VkBot:
                 B = random.randint(0, 255)
                 random_color_image = Image.new("RGB", (512, 512), (R, G, B))
                 random_color_image.save("randomcolor.jpg")
-                what_send = vk_api.upload.VkUpload(vk).photo_messages("randomcolor.jpg", peer_id=self._CHAT_ID)
-                image = "photo" + str(what_send[0]['owner_id']) + "_" + str(what_send[0]['id'])
+                try:
+                    what_send = vk_api.upload.VkUpload(vk).photo_messages("randomcolor.jpg", peer_id=self._CHAT_ID)
+                    image = "photo" + str(what_send[0]['owner_id']) + "_" + str(what_send[0]['id'])
+                except Exception as e:
+                    midnight_output += "Не удалось загрузить картинку с цветом"
+                    log(True, f"Проблема с отправкой картинки цвета: {str(e)}")
                 midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (R, G, B)
 
             self.send(midnight_output, image)
