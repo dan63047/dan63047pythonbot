@@ -148,7 +148,7 @@ class VkBot:
                     what_send = vk_api.upload.VkUpload(vk).photo_messages("randomcolor.jpg", peer_id=self._CHAT_ID)
                     image = "photo" + str(what_send[0]['owner_id']) + "_" + str(what_send[0]['id'])
                 except Exception as e:
-                    midnight_output += "Не удалось загрузить картинку с цветом"
+                    midnight_output += "Не удалось загрузить картинку с цветом<br>"
                     log(True, f"Проблема с отправкой картинки цвета: {str(e)}")
                 midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (R, G, B)
 
@@ -583,10 +583,13 @@ def bots():
                 if event.message.attachments:
                     atch = ''
                     for i in event.message.attachments:
-                        atch += i['type'] + str(i[i['type']]['owner_id']) + "_" + str(i[i['type']]['id']) + " "
+                        if i['type'] == "sticker":
+                            atch += f"sticker_id{i[i['type']]['sticker_id']}"
+                        else:
+                            atch += i['type'] + str(i[i['type']]['owner_id']) + "_" + str(i[i['type']]['id']) + " "
                 else:
                     atch = "nothing"
-                log(False, f'Новое сообщение: peer_id: {event.message.peer_id}, user_id: {event.message.from_id}, text: {event.message.text}, attachments: {atch}')
+                log(False, f'Новое сообщение: peer_id: {event.message.peer_id}, user_id: {event.message.from_id}, text: "{event.message.text}", attachments: {atch}')
                 debug_array['messages_get'] += 1
                 if int(event.message.peer_id) in bot:
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
