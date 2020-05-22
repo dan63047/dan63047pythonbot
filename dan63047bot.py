@@ -359,7 +359,7 @@ class VkBot:
             else:
                 respond = 'Установленные напоминания:<br>'
                 for i in users[self._CHAT_ID]['tasks']:
-                    datetime_time = datetime.datetime.fromtimestamp(int(i)+10800)
+                    datetime_time = datetime.datetime.fromtimestamp(int(i))
                     respond += f"<br>{datetime_time.strftime('%d.%m.%y %H:%M')} - {users[self._CHAT_ID]['tasks'][i]}"
             return respond
         elif stage == "delete":
@@ -576,7 +576,13 @@ def bots():
     for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
-                log(False, f'Новое сообщение: {event.message}')
+                if event.message.attachments:
+                    atch = ''
+                    for i in event.message.attachments:
+                        atch += i['type'] + str(i[i['type']]['owner_id']) + "_" + str(i[i['type']]['id']) + " "
+                else:
+                    atch = "nothing"
+                log(False, f'Новое сообщение: peer_id: {event.message.peer_id}, user_id: {event.message.from_id}, text: {event.message.text}, attachments: {atch}')
                 debug_array['messages_get'] += 1
                 if int(event.message.peer_id) in bot:
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
@@ -585,6 +591,10 @@ def bots():
                     users[event.message.peer_id] = {"midnight": False, "tasks": {}, "await": None, "access": 1}
                     update_users_json(users)
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
+            elif event.type == VkBotEventType.WALL_POST_NEW:
+                log(False, f"На стене группы опубликован новый пост id{event.object.id}: {event.object.text}")
+            else:
+                log(False, str(event))
         except Exception as kek:
             err = "Беды с ботом: " + str(kek)
             log(True, err)
@@ -619,15 +629,14 @@ def check_tasks():
                         continue
         except RuntimeError:
             continue
-        time.sleep(0.3)
-            
+        time.sleep(0.3)           
 
 
 log(False, "Скрипт запущен, чтение users.json для восстановления обьектов ботов")
 load_users()
 tread_bots = threading.Thread(target=bots)
-tread_midnight = threading.Thread(target=midnight)
-tread_tasks = threading.Thread(target=check_tasks)
+tread_midnight = threading.Thread(target=midnight, daemon=True)
+tread_tasks = threading.Thread(target=check_tasks, daemon=True)
 tread_bots.start()
 tread_midnight.start()
 tread_tasks.start()
