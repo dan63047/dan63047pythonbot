@@ -44,7 +44,7 @@ def load_users():
                 users[i] = users_not_json[i]
             users_file.close()
         for i in users:
-            bot[int(i)] = VkBot(i, users[i]["midnight"], users[i]['await'], int(users[i]['access']))
+            bot[int(i)] = VkBot(i, users[i]["midnight"], users[i]['await'], int(users[i]['access']), users[i]['new_post'])
     except Exception as lol:
         log(True, f"Проблема с загрузкой users.json: {str(lol)}")
 
@@ -93,18 +93,15 @@ def get_weather(place):
 
 class VkBot:
 
-    def __init__(self, peer_id, midnight=False, awaiting=None, access=1):
+    def __init__(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False):
 
         log(False, f"Создан объект бота! id{peer_id}")
         self._CHAT_ID = peer_id
         self._AWAITING_INPUT_MODE = awaiting
         self._ACCESS_LEVEL = access
         self._SET_UP_REMINDER = {"task": None, "time": None}
-        
-        if midnight:
-            self._MIDNIGHT_EVENT = True
-        else:
-            self._MIDNIGHT_EVENT = False
+        self._MIDNIGHT_EVENT = midnight
+        self._NEW_POST = new_post
 
         if int(self._CHAT_ID) == int(owner_id):
             self._OWNER = True
@@ -112,7 +109,7 @@ class VkBot:
             self._OWNER = False
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder"]
+                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe"]
 
     def __str__(self):
         return f"peer_id: {str(self._CHAT_ID)}, m: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, tasks: {len(users[self._CHAT_ID]['tasks'])}"
@@ -120,7 +117,7 @@ class VkBot:
     def __del__(self):
         log(False, f"Бот id{str(self._CHAT_ID)} удалён")
 
-    def event(self, event):
+    def event(self, event, something=None):
         if event == "midnight" and self._MIDNIGHT_EVENT:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
             image = None
@@ -154,6 +151,10 @@ class VkBot:
 
             self.send(midnight_output, image)
             log(False, f"Бот id{self._CHAT_ID} оповестил о миднайте")
+        elif event == "post" and self._NEW_POST:
+            post = f"wall{str(something['from_id'])}_{str(something['id'])}"
+            self.send(f"Вышел новый пост", post)
+            log(False, f"Бот id{self._CHAT_ID}: Уведомил о новом посте")
 
     def get_message(self, message, user_id):
         if self._AWAITING_INPUT_MODE:
@@ -196,7 +197,7 @@ class VkBot:
 
             elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
                 respond[
-                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!reminder *set/list/delete* - напоминалка. set устанавливает напоминание, delete удаляет, list выдаёт список ваших напоминаний<br>!h, !help - справка<br>Дата последнего обновления: 21.05.2020 (!reminder)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
+                    'text'] = "Я бот, призванный доставлять неудобства. <br>Команды:<br>!my_id - сообщит ваш id в ВК<br>!user_id *id* - сообщит информацию о этом пользователе<br>!group_id *id* - сообщит информацию о этой группе<br>!image - отправляет рандомную картинку из альбома<br>!weather *город* - отправляет текущую погоду в городе (данные из OpenWeather API)<br>!wiki *запрос* - отправляет информацию об этом из Wikipedia<br>!byn - отправляет текущий курс валют, полученный из API НБ РБ<br>!echo - бот отправляет вам всё, что вы ему пишите<br>!game *камень/ножницы/бумага/статистика* - бот будет играть с вами в \"Камень, ножницы, бумага\" и записывать статистику<br>!midnight - бот будет уведомлять вас о 00:00 по Москве. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!reminder *set/list/delete* - напоминалка. set устанавливает напоминание, delete удаляет, list выдаёт список ваших напоминаний<br>!subscribe - бот будет уведомлять вас новых постах в группе. Отправьте ещё раз, чтобы бот больше вас не уведомлял<br>!h, !help - справка<br>Дата последнего обновления: 23.05.2020 (!subscribe)<br>Проект бота на GitHub: https://github.com/dan63047/dan63047pythonbot"
 
             elif message[0] == self._COMMANDS[3]:
                 try:
@@ -249,15 +250,13 @@ class VkBot:
             elif message[0] == self._COMMANDS[12]:
                 if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
                     if self._MIDNIGHT_EVENT:
-                        self._MIDNIGHT_EVENT = False
+                        self.change_midnight(False)
                         self.send("Уведомление о миднайте выключено")
                         log(False, f"Бот id{self._CHAT_ID}: Юзер отписался от ивента \"Миднайт\"")
                     else:
-                        self._MIDNIGHT_EVENT = True
+                        self.change_midnight(True)
                         self.send("Бот будет уведомлять вас о каждом миднайте")
                         log(False, f"Бот id{self._CHAT_ID}: Юзер подписался на ивент \"Миднайт\"")
-                    users[self._CHAT_ID]["midnight"] = self._MIDNIGHT_EVENT
-                    update_users_json(users)
                 else:
                     respond['text'] = errors_array["access"]
 
@@ -297,6 +296,19 @@ class VkBot:
                             self.change_await("reminder delete")
                 except IndexError:
                     respond["text"] = errors_array['miss_argument']
+            
+            elif message[0] == self._COMMANDS[16]:
+                if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
+                    if self._NEW_POST:
+                        self.change_new_post(False)
+                        self.send("Уведомление о новом посте выключено")
+                        log(False, f"Бот id{self._CHAT_ID}: Юзер отписался от новых постов")
+                    else:
+                        self.change_new_post(True)
+                        self.send("Бот будет уведомлять вас о каждом новом посте")
+                        log(False, f"Бот id{self._CHAT_ID}: Юзер подписался на уведомления о новых постах")
+                else:
+                    respond['text'] = errors_array["access"]
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
@@ -566,6 +578,24 @@ class VkBot:
             users[self._CHAT_ID]['access']= self._ACCESS_LEVEL
         update_users_json(users)
 
+    def change_new_post(self, new_post):
+        self._NEW_POST = new_post
+        try:
+            users[self._CHAT_ID]['new_post']= self._NEW_POST
+        except KeyError:
+            users[self._CHAT_ID].setdefault("new_post", None)
+            users[self._CHAT_ID]['new_post']= self._NEW_POST
+        update_users_json(users)
+    
+    def change_midnight(self, midnight):
+        self._MIDNIGHT_EVENT = midnight
+        try:
+            users[self._CHAT_ID]['midnight']= self._MIDNIGHT_EVENT
+        except KeyError:
+            users[self._CHAT_ID].setdefault("midnight", None)
+            users[self._CHAT_ID]['midnight']= self._MIDNIGHT_EVENT
+        update_users_json(users)
+
     def send(self, message=None, attachment=None):
         message = vk.method('messages.send',
                             {'peer_id': self._CHAT_ID, 'message': message, 'random_id': time.time(),
@@ -580,26 +610,30 @@ def bots():
     for event in MyVkLongPoll.listen(longpoll):
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
+                log_msg = f'Новое сообщение: peer_id: {event.message.peer_id}, user_id: {event.message.from_id}, text: "{event.message.text}"'
                 if event.message.attachments:
-                    atch = ''
+                    atch = ', attachments: '
                     for i in event.message.attachments:
                         if i['type'] == "sticker":
                             atch += f"sticker_id{i[i['type']]['sticker_id']}"
+                        elif i['type'] == "wall":
+                            atch += i['type'] + str(i[i['type']]['from_id']) + "_" + str(i[i['type']]['id']) + " "
                         else:
                             atch += i['type'] + str(i[i['type']]['owner_id']) + "_" + str(i[i['type']]['id']) + " "
-                else:
-                    atch = "nothing"
-                log(False, f'Новое сообщение: peer_id: {event.message.peer_id}, user_id: {event.message.from_id}, text: "{event.message.text}", attachments: {atch}')
+                    log_msg += atch
+                log(False, log_msg)
                 debug_array['messages_get'] += 1
                 if int(event.message.peer_id) in bot:
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
                 else:
                     bot[event.message.peer_id] = VkBot(event.message.peer_id)
-                    users[event.message.peer_id] = {"midnight": False, "tasks": {}, "await": None, "access": 1}
+                    users[event.message.peer_id] = {"midnight": False, "tasks": {}, "await": None, "access": 1, "new_post": False}
                     update_users_json(users)
                     bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
             elif event.type == VkBotEventType.WALL_POST_NEW:
                 log(False, f"На стене группы опубликован новый пост id{event.object.id}: {event.object.text}")
+                for i in users:
+                    bot[int(i)].event("post", event.object)
             else:
                 log(False, str(event))
         except Exception as kek:
