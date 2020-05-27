@@ -109,10 +109,10 @@ class VkBot:
             self._OWNER = False
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe"]
+                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe", "!random"]
 
     def __str__(self):
-        return f"peer_id: {str(self._CHAT_ID)}, m: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, tasks: {len(users[self._CHAT_ID]['tasks'])}"
+        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_LEVEL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, tasks: {len(users[self._CHAT_ID]['tasks'])}, sub: {str(self._NEW_POST)}"
 
     def __del__(self):
         log(False, f"[BOT_{str(self._CHAT_ID)}] Bot-object has been deleted")
@@ -314,6 +314,17 @@ class VkBot:
                         log(False, f"[BOT_{self._CHAT_ID}] Subscribed on new posts")
                 else:
                     respond['text'] = errors_array["access"]
+            
+            elif message[0] == self._COMMANDS[17]:
+                try:
+                    message[1] = message[1].split(' ', 1)
+                    try:
+                        respond['text'] = self.random_number(int(message[1][0]), int(message[1][1]))
+                    except:
+                        respond['text'] = self.random_number(0, int(message[1][0]))
+                except:
+                    respond['text'] = self.random_number(0, 10)
+
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
@@ -563,6 +574,10 @@ class VkBot:
             log(True, err)
             return "Невозможно получить данные из НБ РБ: " + str(mda)
 
+    def random_number(self, lower, higher):
+        r = random.randint(lower, higher)
+        return f"Рандомное число от {lower} до {higher}:<br>{r}"
+
     def change_await(self, awaiting=None):
         self._AWAITING_INPUT_MODE = awaiting
         try:
@@ -643,8 +658,11 @@ def bots():
                 log(False, f"[NEW_POST] id{event.object.id}")
                 for i in users:
                     bot[int(i)].event("post", event.object)
-            else:
-                log(False, str(event))
+            elif event.type == VkBotEventType.MESSAGE_DENY:
+                log(False, f"User {event.object.user_id} deny messages from that group")
+                del bot[int(event.object.user_id)]
+                del users[int(event.object.user_id)]
+                update_users_json(users)
         except Exception as kek:
             err = "Беды с ботом: " + str(kek)
             log(True, err)
