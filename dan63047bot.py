@@ -149,7 +149,7 @@ class VkBot:
         message = event.message.text
         user_id = event.message.from_id
         if self._ADMIN_MODE:
-            if message.find("@all") != -1 or message.find("@online") != -1 or message.find("@here") != -1 or message.find("@everyone") != -1:
+            if message.find("@all") != -1 or message.find("@online") != -1 or message.find("@here") != -1 or message.find("@everyone") != -1 or message.find("@здесь") != -1 or message.find("@все") != -1:
                 self.send("Дебил")
                 try:
                     if int(user_id) != int(owner_id):
