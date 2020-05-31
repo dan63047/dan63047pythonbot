@@ -44,7 +44,17 @@ def load_users():
                 users[i] = users_not_json[i]
             users_file.close()
         for i in users:
-            bot[int(i)] = VkBot(i, users[i]["midnight"], users[i]['await'], int(users[i]['access']), users[i]['new_post'])
+            if "midnight" not in users[i]:
+                users[i]["midnight"] = False
+            if 'await' not in users[i]:
+                users[i]['await'] = None
+            if 'access' not in users[i]:
+                users[i]['access'] = 1
+            if 'new_post' not in users[i]:
+                users[i]['new_post'] = False
+            if 'admin_mode' not in users[i]:
+                users[i]['admin_mode'] = False
+            bot[int(i)] = VkBot(i, users[i]["midnight"], users[i]['await'], int(users[i]['access']), users[i]['new_post'], users[i]['admin_mode'])
     except Exception as lol:
         log(True, f"Problem with users.json: {str(lol)}")
 
@@ -93,7 +103,7 @@ def get_weather(place):
 
 class VkBot:
 
-    def __init__(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False):
+    def __init__(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False):
 
         log(False, f"[BOT_{peer_id}] Created new bot-object")
         self._CHAT_ID = peer_id
@@ -102,6 +112,7 @@ class VkBot:
         self._SET_UP_REMINDER = {"task": None, "time": None}
         self._MIDNIGHT_EVENT = midnight
         self._NEW_POST = new_post
+        self._ADMIN_MODE = admin_mode
 
         if int(self._CHAT_ID) == int(owner_id):
             self._OWNER = True
@@ -109,10 +120,10 @@ class VkBot:
             self._OWNER = False
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe", "!random"]
+                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe", "!random", "!admin_mode"]
 
     def __str__(self):
-        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_LEVEL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, tasks: {len(users[self._CHAT_ID]['tasks'])}, sub: {str(self._NEW_POST)}"
+        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_LEVEL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, tasks: {len(users[self._CHAT_ID]['tasks'])}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}"
 
     def __del__(self):
         log(False, f"[BOT_{str(self._CHAT_ID)}] Bot-object has been deleted")
@@ -120,43 +131,34 @@ class VkBot:
     def event(self, event, something=None):
         if event == "midnight" and self._MIDNIGHT_EVENT:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
-            image = None
 
             midnight_text = ["Миднайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!"]
-            midnight_after = ["Ложись спать!", "P E A C E  A N D  T R A N Q U I L I T Y", "Поиграй в майнкрафт",
-                              "Втыкай в ВК дальше", "hat in time is gay", "RIP 2013-2019 Gears for Breakfast", "Egg",
-                              "вещ или бан", "Мой ник в игре _ичё", "Я жил, но что-то пошло не так",
-                              "Когда тебе похуй, ты неувязвим", "Who's Afraid Of 138?!"]
+            # midnight_after = ["Ложись спать!", "P E A C E  A N D  T R A N Q U I L I T Y", "Поиграй в майнкрафт",
+            #                   "Втыкай в ВК дальше", "hat in time is gay", "RIP 2013-2019 Gears for Breakfast", "Egg",
+            #                   "вещ или бан", "Мой ник в игре _ичё", "Я жил, но что-то пошло не так",
+            #                   "Когда тебе похуй, ты неувязвим", "Who's Afraid Of 138?!"]
 
-            midnight_output = random.choice(midnight_text) + "<br>" + f"Наступило {current_time.strftime('%d.%m.%Y')}<br><br>"
-            random_thing = random.randint(0, 2)
-            if random_thing == 0:
-                midnight_output += random.choice(midnight_after)
-            elif random_thing == 1:
-                midnight_output += "Картинка дня:"
-                image = self.random_image()
-            elif random_thing == 2:
-                R = random.randint(0, 255)
-                G = random.randint(0, 255)
-                B = random.randint(0, 255)
-                random_color_image = Image.new("RGB", (512, 512), (R, G, B))
-                random_color_image.save("randomcolor.jpg")
-                try:
-                    what_send = vk_api.upload.VkUpload(vk).photo_messages("randomcolor.jpg", peer_id=self._CHAT_ID)
-                    image = "photo" + str(what_send[0]['owner_id']) + "_" + str(what_send[0]['id'])
-                except Exception as e:
-                    midnight_output += "Не удалось загрузить картинку с цветом<br>"
-                    log(True, f"Проблема с отправкой картинки цвета: {str(e)}")
-                midnight_output += "Цвет дня в формате HEX: #%02x%02x%02x" % (R, G, B)
-
-            self.send(midnight_output, image)
+            self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}<br>Картинка дня:", self.random_image())
             log(False, f"[BOT_{self._CHAT_ID}] Notified about midnight")
         elif event == "post" and self._NEW_POST:
             post = f"wall{str(something['from_id'])}_{str(something['id'])}"
             self.send(f"Вышел новый пост", post)
             log(False, f"[BOT_{self._CHAT_ID}] Notified about new post")
 
-    def get_message(self, message, user_id):
+    def get_message(self, event):
+        message = event.message.text
+        user_id = event.message.from_id
+        if self._ADMIN_MODE:
+            if message.find("@all") != -1 or message.find("@online") != -1 or message.find("@here") != -1 or message.find("@everyone") != -1:
+                self.send("Дебил")
+                try:
+                    if int(user_id) != int(owner_id):
+                        vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
+                        log(False, f"[BOT_{self._CHAT_ID}] user id{user_id} has been kicked")
+                    else:
+                        log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
+                except Exception as e:
+                    log(True, f"[BOT_{self._CHAT_ID}] can't kick user id{user_id} - {str(e)}")
         if self._AWAITING_INPUT_MODE:
             if message == "Назад":
                 self.change_await()
@@ -324,7 +326,25 @@ class VkBot:
                         respond['text'] = self.random_number(0, int(message[1][0]))
                 except:
                     respond['text'] = self.random_number(0, 10)
-
+            elif message[0] == self._COMMANDS[18]:
+                if int(self._CHAT_ID) <= 2000000000:
+                    respond['text'] = "Данный чат не является беседой"
+                elif int(user_id) != int(owner_id):
+                    respond['text'] = errors_array["access"]
+                else:
+                    try:
+                        vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": group_id})
+                        if self._ADMIN_MODE:
+                            respond["text"] = "Режим модерирования выключен"
+                            self.change_admin_mode(False)
+                            log(False, f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
+                        else:
+                            respond["text"] = "Режим модерирования включён"
+                            self.change_admin_mode(True)
+                            log(False, f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
+                    except Exception:
+                        respond["text"] = "У меня нет прав администратора"
+                    
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
@@ -613,6 +633,15 @@ class VkBot:
             users[self._CHAT_ID].setdefault("midnight", None)
             users[self._CHAT_ID]['midnight']= self._MIDNIGHT_EVENT
         update_users_json(users)
+    
+    def change_admin_mode(self, admin_mode):
+        self._ADMIN_MODE = admin_mode
+        try:
+            users[self._CHAT_ID]['admin_mode']= self._ADMIN_MODE
+        except KeyError:
+            users[self._CHAT_ID].setdefault("admin_mode", None)
+            users[self._CHAT_ID]['admin_mode']= self._ADMIN_MODE
+        update_users_json(users)
 
     def send(self, message=None, attachment=None):
         try:
@@ -648,12 +677,12 @@ def bots():
                 log(False, log_msg)
                 debug_array['messages_get'] += 1
                 if int(event.message.peer_id) in bot:
-                    bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
+                    bot[event.message.peer_id].get_message(event)
                 else:
                     bot[event.message.peer_id] = VkBot(event.message.peer_id)
-                    users[event.message.peer_id] = {"midnight": False, "tasks": {}, "await": None, "access": 1, "new_post": False}
+                    users[event.message.peer_id] = {"midnight": False, "tasks": {}, "await": None, "access": 1, "new_post": False, 'admin_mode': False}
                     update_users_json(users)
-                    bot[event.message.peer_id].get_message(event.message.text, event.message.from_id)
+                    bot[event.message.peer_id].get_message(event)
             elif event.type == VkBotEventType.WALL_POST_NEW:
                 log(False, f"[NEW_POST] id{event.object.id}")
                 for i in users:
