@@ -17,9 +17,11 @@ from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 root_logger = logging.getLogger()
 root_logger.setLevel(logging.INFO)
 try:
-    handler = logging.FileHandler(f'logs/bot_log{str(datetime.datetime.now())}.log', 'w', 'utf-8')
+    log_path = f'logs/bot_log{str(datetime.datetime.now())}.log'
+    handler = logging.FileHandler(log_path, 'w', 'utf-8')
 except:
-    handler = logging.FileHandler('bot.log', 'w', 'utf-8')
+    log_path = 'bot.log'
+    handler = logging.FileHandler(log_path, 'w', 'utf-8')
 handler.setFormatter(logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s'))
 root_logger.addHandler(handler)
 
@@ -449,7 +451,7 @@ class VkBot:
     def debug(self, arg=None):
         if arg == "log":
             if self._OWNER:
-                with open("bot.log", 'r') as f:
+                with open(log_path, 'r') as f:
                     log = list(deque(f, 10))
                     text_log = "<br>Последние 10 строк из лога:<br>"
                     for i in range(len(log)):
