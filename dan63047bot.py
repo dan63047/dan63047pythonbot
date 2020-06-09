@@ -783,7 +783,7 @@ def bots():
                 log(False, f"[NEW_POST] id{event.object.id}")
                 users = db.get_all_users()
                 for i in users:
-                    bot[int(i)].event("post", event.object)
+                    bot[int(i['chat_id'])].event("post", event.object)
             elif event.type == VkBotEventType.MESSAGE_DENY:
                 log(False, f"User {event.object.user_id} deny messages from that group")
                 del bot[int(event.object.user_id)]
