@@ -285,6 +285,7 @@ class VkBot:
                 except Exception as e:
                     log(True, f"[BOT_{self._CHAT_ID}] can't kick user id{user_id} - {str(e)}")
             with open('bad_words.txt', 'r') as filter:
+                flag = False
                 for word in filter:
                     if flag:
                         log(False, f"[BOT_{self._CHAT_ID}] bad word detected")
