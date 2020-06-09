@@ -37,7 +37,7 @@ def log(warning, text):
 log(False, "Script started")
 
 bot = {}
-debug_array = {'vk_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
+debug_array = {'vk_warnings': 0, 'db_warnings': 0, 'bot_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
 errors_array = {"access": "Отказано в доступе", "miss_argument": "Отсуствует аргумент"}
 
 longpoll = VkBotLongPoll(vk, group_id)
@@ -66,6 +66,7 @@ class MySQL_worker():
             cur.close()
             log(False, f"Database connection established")
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to connect to database: {str(e)}")
             
     def set_new_user(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False, game_wins=0, game_defeats=0, game_draws=0):
@@ -75,6 +76,7 @@ class MySQL_worker():
             self._CON.commit()
             cur.close()
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to add new user in database: {str(e)}")
     
     def get_all_users(self):
@@ -85,6 +87,7 @@ class MySQL_worker():
             cur.close()
             return result
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to load user from database: {str(e)}")
 
     def get_from_users(self, from_id):
@@ -95,7 +98,19 @@ class MySQL_worker():
             cur.close()
             return result
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to load user from database: {str(e)}")
+
+    def get_game_stat(self):
+        try:
+            cur = self._CON.cursor()
+            cur.execute("SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
+            result = cur.fetchall()
+            cur.close()
+            return result
+        except Exception as e:
+            debug_array['db_warnings'] += 1
+            log(True, f"Unable to load stats from database: {str(e)}")
     
     def update_user(self, chat_id, thing, new_value):
         try:
@@ -104,16 +119,18 @@ class MySQL_worker():
             self._CON.commit()
             cur.close()
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to update info about user in database: {str(e)}")
 
     def delete_user(self, chat_id):
         try:
             cur = self._CON.cursor()
-            cur.execute("DELETE FROM bot_users WHERE chat_id = %s", (chat_id))
+            cur.execute("DELETE FROM bot_users, game_defeats WHERE chat_id = %s", (chat_id))
             self._CON.commit()
             cur.close()
             return True
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to delete user from database: {str(e)}")
             return False
 
@@ -125,6 +142,7 @@ class MySQL_worker():
             cur.close()
             return result
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to load tasks from database: {str(e)}")
 
     def set_new_task(self, chat_id, time, task):
@@ -134,6 +152,7 @@ class MySQL_worker():
             self._CON.commit()
             cur.close()
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to add new task in database: {str(e)}")
 
     def get_from_tasks(self, from_id):
@@ -144,6 +163,7 @@ class MySQL_worker():
             cur.close()
             return result
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to load tasks from database: {str(e)}")
     
     def delete_task(self, from_id, task):
@@ -154,6 +174,7 @@ class MySQL_worker():
             cur.close()
             return True
         except Exception as e:
+            debug_array['db_warnings'] += 1
             log(True, f"Unable to delete task from database: {str(e)}")
             return False
 
@@ -166,6 +187,7 @@ def load_users():
         for i in get_info:
             bot[int(i['chat_id'])] = VkBot(i['chat_id'], i['midnight'], i['awaiting'], int(i['access']), i['new_post'], i['admin_mode'])
     except Exception as lol:
+        debug_array['bot_warnings'] += 1
         log(True, f"Problem with creating objects: {str(lol)}")
 
 
@@ -468,6 +490,29 @@ class VkBot:
                 return answer
             else:
                 return errors_array["access"]
+        elif arg == "game":
+            stats = db.get_game_stat()
+            if len(stats) > 0:
+                answer = "Статистика игроков в !game"
+                for i in stats:
+                    try:
+                        winrate = (i['game_wins']/(i['game_wins']+i['game_defeats']+i['game_draws'])) * 100
+                    except ZeroDivisionError:
+                        winrate = 0
+                    answer += f"<br> @id{i['chat_id']} - Сыграл раз: {i['game_wins']+i['game_defeats']+i['game_draws']}, Победы/Ничьи/Поражения: {i['game_wins']}/{i['game_defeats']}/{i['game_draws']}, {toFixed(winrate, 2)}% побед"
+            else:
+                answer = "Никто не пользуется !game"
+            return answer
+        elif arg == "tasks":
+            if self._OWNER:
+                tasks = db.get_all_tasks()
+                if len(tasks) > 0:
+                    answer = "Напоминания в !reminder"
+                    for i in tasks:
+                        answer += f"<br>id{i['chat_id']} - {i['time']}: {i['task']}"
+                else:
+                    answer = "Никто не пользуется !reminder"
+            return answer
         else:
             up_time = time.time() - debug_array['start_time']
             time_d = int(up_time) / (3600 * 24)
@@ -477,9 +522,13 @@ class VkBot:
             str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
             datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
             answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
-                debug_array['messages_get']) + " (Отправлено " + str(
-                debug_array['messages_answered']) + ")<br>Ошибок в работе: " + str(
-                debug_array['logger_warnings']) + " (Из них беды с ВК: " + str(debug_array['vk_warnings']) + ")<br>Обьектов бота: " + str(len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
+                debug_array['messages_get']) + "<br>Отправлено сообщений:" + str(
+                debug_array['messages_answered']) + "<br>Ошибок в работе: " + str(
+                debug_array['logger_warnings']) + ", из них:<br> •Беды с ВК: " + str(
+                debug_array['vk_warnings']) + "<br> •Беды с БД: " + str(
+                debug_array['db_warnings']) + "<br> •Беды с ботом: " + str(
+                debug_array['bot_warnings']) + "<br>Обьектов бота: " + str(
+                len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
             return answer
 
     def reminder(self, string, stage):
@@ -742,8 +791,8 @@ def bots():
             else:
                 log(False, f"Event {str(event.type)} happend")
         except Exception as kek:
-            err = "Беды с ботом: " + str(kek)
-            log(True, err)
+            log(True, f"Беды с ботом: {str(kek)}")
+            debug_array['bot_warnings'] += 1
             continue
 
 def midnight():
