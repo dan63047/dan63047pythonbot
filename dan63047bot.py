@@ -499,7 +499,7 @@ class VkBot:
                         winrate = (i['game_wins']/(i['game_wins']+i['game_defeats']+i['game_draws'])) * 100
                     except ZeroDivisionError:
                         winrate = 0
-                    answer += f"<br> @id{i['chat_id']} - Сыграл раз: {i['game_wins']+i['game_defeats']+i['game_draws']}, Победы/Ничьи/Поражения: {i['game_wins']}/{i['game_defeats']}/{i['game_draws']}, {toFixed(winrate, 2)}% побед"
+                    answer += f"<br> @id{i['chat_id']} - Сыграл раз: {i['game_wins']+i['game_defeats']+i['game_draws']}, Победы/Ничьи/Поражения: {i['game_wins']}/{i['game_draws']}/{i['game_defeats']}, {toFixed(winrate, 2)}% побед"
             else:
                 answer = "Никто не пользуется !game"
             return answer
@@ -522,7 +522,7 @@ class VkBot:
             str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
             datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
             answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
-                debug_array['messages_get']) + "<br>Отправлено сообщений:" + str(
+                debug_array['messages_get']) + "<br>Отправлено сообщений: " + str(
                 debug_array['messages_answered']) + "<br>Ошибок в работе: " + str(
                 debug_array['logger_warnings']) + ", из них:<br> •Беды с ВК: " + str(
                 debug_array['vk_warnings']) + "<br> •Беды с БД: " + str(
