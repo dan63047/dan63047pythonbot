@@ -275,7 +275,7 @@ class VkBot:
         user_id = event.message.from_id
         if self._ADMIN_MODE:
             if message.find("@all") != -1 or message.find("@online") != -1 or message.find("@here") != -1 or message.find("@everyone") != -1 or message.find("@здесь") != -1 or message.find("@все") != -1:
-                self.send("Дебил")
+                self.send(f"[@id{user_id}|Дебил]")
                 try:
                     if int(user_id) != int(owner_id):
                         vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
@@ -284,6 +284,15 @@ class VkBot:
                         log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
                 except Exception as e:
                     log(True, f"[BOT_{self._CHAT_ID}] can't kick user id{user_id} - {str(e)}")
+            with open('bad_words.txt', 'r') as filter:
+                for word in filter:
+                    if flag:
+                        log(False, f"[BOT_{self._CHAT_ID}] bad word detected")
+                        if random.randint(1, 5) == 1:
+                            self.send("За м*т извенись")
+                        break
+                    if message.lower().find(word) != -1:
+                        flag = True
         if self._AWAITING_INPUT_MODE:
             if message == "Назад":
                 self.change_await()
