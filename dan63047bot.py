@@ -22,17 +22,19 @@ try:
 except:
     log_path = 'bot.log'
     handler = logging.FileHandler(log_path, 'w', 'utf-8')
-handler.setFormatter(logging.Formatter('[%(asctime)s][%(levelname)s] %(message)s'))
+handler.setFormatter(logging.Formatter('%(message)s'))
 root_logger.addHandler(handler)
 
 def log(warning, text):
     if warning:
-        logging.warning(text)
+        msg = "[" + str(datetime.datetime.now()) + "] [WARNING] " + text
+        logging.warning(msg)
+        print(msg)
         debug_array['logger_warnings'] += 1
-        print("[" + str(datetime.datetime.now()) + "] [WARNING] " + text)
     else:
-        logging.info(text)
-        print("[" + str(datetime.datetime.now()) + "] " + text)
+        msg = "[" + str(datetime.datetime.now()) + "] " + text
+        logging.info(msg)
+        print(msg)
 
 log(False, "Script started")
 
