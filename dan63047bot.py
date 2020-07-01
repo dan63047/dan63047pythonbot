@@ -11,7 +11,7 @@ import pymysql
 from pymysql.cursors import DictCursor
 import wikipediaapi as wiki
 from collections import deque
-from config import vk, owm, vk_mda, group_id, album_for_command, owner_id, mysql_host, mysql_pass, mysql_user, mysql_db
+import config
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 root_logger = logging.getLogger()
@@ -40,154 +40,144 @@ log(False, "Script started")
 
 bot = {}
 debug_array = {'vk_warnings': 0, 'db_warnings': 0, 'bot_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
-errors_array = {"access": "Отказано в доступе", "miss_argument": "Отсуствует аргумент"}
+errors_array = {"access": "Отказано в доступе", "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
 
-longpoll = VkBotLongPoll(vk, group_id)
+longpoll = VkBotLongPoll(config.vk, config.group_id)
 
-class MySQL_worker():
+class Database_worker():
     
     def __init__(self):
-        try:
-            self._CON = pymysql.connect(
-                host= mysql_host,
-                user= mysql_user,
-                password= mysql_pass,
-                db= mysql_db,
-                charset='utf8mb4',
-                cursorclass=DictCursor
-            )
-            cur = self._CON.cursor()
+        if(config.use_database):
+            log(False, "Trying to connect to database")
+            try:
+                self._CON = pymysql.connect(
+                    host= config.mysql_host,
+                    user= config.mysql_user,
+                    password= config.mysql_pass,
+                    db= config.mysql_db,
+                    charset='utf8mb4',
+                    cursorclass=DictCursor
+                )
+                cur = self._CON.cursor()
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to connect to database: {str(e)}")
             try:
                 cur.execute("SELECT * FROM bot_users")
             except:
                 cur.execute("CREATE TABLE bot_users ( id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, chat_id INT UNSIGNED, awaiting VARCHAR(128), access TINYINT, midnight BOOL, new_post BOOL, admin_mode BOOL, game_wins INT UNSIGNED, game_defeats INT UNSIGNED, game_draws INT UNSIGNED)")
-            try:
-                cur.execute("SELECT * FROM tasks")
-            except:
-                cur.execute("CREATE TABLE tasks (id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, chat_id INT UNSIGNED, time INT UNSIGNED, task TEXT)")
             cur.close()
             log(False, f"Database connection established")
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to connect to database: {str(e)}")
+        else:
+            log(False, "Bot will use JSON file as database")
+            try:
+                with open("data.json", "r") as data:
+                    self._DATA_DIST = json.load(data)
+                    data.close()
+            except Exception:
+                log(True, "data.json is not exist, it will be created soon")
+                self._DATA_DIST = {"users": {}}
             
     def set_new_user(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False, game_wins=0, game_defeats=0, game_draws=0):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("INSERT INTO bot_users (chat_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (peer_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws))
-            self._CON.commit()
-            cur.close()
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to add new user in database: {str(e)}")
+        if(config.use_database):
+            try:
+                cur = self._CON.cursor()
+                cur.execute("INSERT INTO bot_users (chat_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (peer_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws))
+                self._CON.commit()
+                cur.close()
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to add new user in database: {str(e)}")
+        else:
+            self._DATA_DIST['users'][peer_id] = {"awaiting": awaiting, "access": access, "midnight": midnight, "new_post": new_post, "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws}
+            open("data.json", "w").write(json.dumps(self._DATA_DIST))
+
     
     def get_all_users(self):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("SELECT * FROM bot_users")
-            result = cur.fetchall()
-            cur.close()
-            return result
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to load user from database: {str(e)}")
+        if(config.use_database):
+            try:
+                cur = self._CON.cursor()
+                cur.execute("SELECT * FROM bot_users")
+                result = cur.fetchall()
+                cur.close()
+                return result
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to load user from database: {str(e)}")
+        else:
+            return self._DATA_DIST['users']
 
     def get_from_users(self, from_id):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("SELECT * FROM bot_users WHERE chat_id = %s", (from_id))
-            result = cur.fetchall()
-            cur.close()
-            return result
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to load user from database: {str(e)}")
+        if(config.use_database):
+            try:
+                cur = self._CON.cursor()
+                cur.execute("SELECT * FROM bot_users WHERE chat_id = %s", (from_id))
+                result = cur.fetchall()
+                cur.close()
+                return result
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to load user from database: {str(e)}")
+        else:
+            return self._DATA_DIST['users'][str(from_id)]
 
     def get_game_stat(self):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
-            result = cur.fetchall()
-            cur.close()
-            return result
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to load stats from database: {str(e)}")
+        if(config.use_database):
+            try:
+                cur = self._CON.cursor()
+                cur.execute("SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
+                result = cur.fetchall()
+                cur.close()
+                return result
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to load stats from database: {str(e)}")
+        else:
+            return self._DATA_DIST['users']
+            # Info: dist cannot return only the necessary keys
     
     def update_user(self, chat_id, thing, new_value):
-        try:
-            cur = self._CON.cursor()
-            cur.execute(f"UPDATE bot_users SET {thing} = %s WHERE bot_users.chat_id = %s;", (new_value, chat_id))
-            self._CON.commit()
-            cur.close()
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to update info about user in database: {str(e)}")
+        if(config.use_database):
+            try:
+                cur = self._CON.cursor()
+                cur.execute(f"UPDATE bot_users SET {thing} = %s WHERE bot_users.chat_id = %s;", (new_value, chat_id))
+                self._CON.commit()
+                cur.close()
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to update info about user in database: {str(e)}")
+        else:
+            self._DATA_DIST['users'][str(chat_id)][thing] = new_value
+            open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
     def delete_user(self, chat_id):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("DELETE FROM bot_users, game_defeats WHERE chat_id = %s", (chat_id))
-            self._CON.commit()
-            cur.close()
-            return True
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to delete user from database: {str(e)}")
-            return False
+        if(config.use_database):
+            try:
+                cur = self._CON.cursor()
+                cur.execute("DELETE FROM bot_users, game_defeats WHERE chat_id = %s", (chat_id))
+                self._CON.commit()
+                cur.close()
+                return True
+            except Exception as e:
+                debug_array['db_warnings'] += 1
+                log(True, f"Unable to delete user from database: {str(e)}")
+                return False
+        else:
+            self._DATA_DIST['users'].pop(str(chat_id))
+            open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
-    def get_all_tasks(self):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("SELECT * FROM tasks")
-            result = cur.fetchall()
-            cur.close()
-            return result
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to load tasks from database: {str(e)}")
-
-    def set_new_task(self, chat_id, time, task):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("INSERT INTO tasks (chat_id, time, task) VALUES (%s, %s, %s)", (chat_id, time, task))
-            self._CON.commit()
-            cur.close()
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to add new task in database: {str(e)}")
-
-    def get_from_tasks(self, from_id):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("SELECT * FROM tasks WHERE chat_id = %s", (from_id))
-            result = cur.fetchall()
-            cur.close()
-            return result
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to load tasks from database: {str(e)}")
-    
-    def delete_task(self, from_id, task):
-        try:
-            cur = self._CON.cursor()
-            cur.execute("DELETE FROM tasks WHERE chat_id = %s AND task = %s", (from_id, task))
-            self._CON.commit()
-            cur.close()
-            return True
-        except Exception as e:
-            debug_array['db_warnings'] += 1
-            log(True, f"Unable to delete task from database: {str(e)}")
-            return False
-
-db = MySQL_worker()
+db = Database_worker()
 
 def load_users():
     try:
         log(False, "Reading database")
         get_info = db.get_all_users()
-        for i in get_info:
-            bot[int(i['chat_id'])] = VkBot(i['chat_id'], i['midnight'], i['awaiting'], int(i['access']), i['new_post'], i['admin_mode'])
+        if(config.use_database):
+            for i in get_info:
+                bot[int(i['chat_id'])] = VkBot(int(i['chat_id']), bool(i['midnight']), i['awaiting'], int(i['access']), bool(i['new_post']), bool(i['admin_mode']))
+        else:
+            for i in get_info:
+                bot[int(i)] = VkBot(int(i), bool(get_info[i]['midnight']), get_info[i]['awaiting'], int(get_info[i]['access']), bool(get_info[i]['new_post']), bool(get_info[i]['admin_mode']))
     except Exception as lol:
         debug_array['bot_warnings'] += 1
         log(True, f"Problem with creating objects: {str(lol)}")
@@ -216,16 +206,16 @@ def create_new_bot_object(chat_id):
 
 def get_weather(place):
     try:
-        weather_request = owm.weather_at_place(place)
-    except pyowm.exceptions.api_response_error.NotFoundError as i:
+        weather_request = config.mgr.weather_at_place(place)
+    except Exception as i:
         err = "A problem with OpenWeather API: " + str(i)
         log(True, err)
         return "Такого города нет, либо данных о погоде нет"
-    weather_answer = weather_request.get_weather()
-    info = "OpenWeather API: " + str(weather_answer)
-    log(False, info)
-    return "В городе " + place + " сейчас " + weather_answer.get_detailed_status() + ", " + str(
-        round(weather_answer.get_temperature('celsius')['temp'])) + "°C"
+    weather_status = weather_request.weather.detailed_status
+    weather_temp = weather_request.weather.temperature('celsius')
+    weather_humidity = weather_request.weather.humidity
+    weather_wing = weather_request.weather.wind()
+    return f"Погода в городе {place}<br> {str(round(weather_temp['temp']))}°C, {weather_status}<br>Влажность: {weather_humidity}%<br>Ветер: {weather_wing['speed']} м/с"
 
 
 class VkBot:
@@ -241,7 +231,7 @@ class VkBot:
         self._NEW_POST = new_post
         self._ADMIN_MODE = admin_mode
 
-        if int(self._CHAT_ID) == int(owner_id):
+        if int(self._CHAT_ID) == int(config.owner_id):
             self._OWNER = True
         else:
             self._OWNER = False
@@ -259,12 +249,7 @@ class VkBot:
         if event == "midnight" and self._MIDNIGHT_EVENT:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
 
-            midnight_text = ["Миднайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!"]
-            # midnight_after = ["Ложись спать!", "P E A C E  A N D  T R A N Q U I L I T Y", "Поиграй в майнкрафт",
-            #                   "Втыкай в ВК дальше", "hat in time is gay", "RIP 2013-2019 Gears for Breakfast", "Egg",
-            #                   "вещ или бан", "Мой ник в игре _ичё", "Я жил, но что-то пошло не так",
-            #                   "Когда тебе похуй, ты неувязвим", "Who's Afraid Of 138?!"]
-
+            midnight_text = ["Миднайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!", "00:00"]
             self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}<br>Картинка дня:", self.random_image())
             log(False, f"[BOT_{self._CHAT_ID}] Notified about midnight")
         elif event == "post" and self._NEW_POST:
@@ -279,45 +264,30 @@ class VkBot:
             if message.find("@all") != -1 or message.find("@online") != -1 or message.find("@here") != -1 or message.find("@everyone") != -1 or message.find("@здесь") != -1 or message.find("@все") != -1:
                 self.send(f"[@id{user_id}|Дебил]")
                 try:
-                    if int(user_id) != int(owner_id):
-                        vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
+                    if int(user_id) != int(config.owner_id):
+                        config.vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
                         log(False, f"[BOT_{self._CHAT_ID}] user id{user_id} has been kicked")
                     else:
                         log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
                 except Exception as e:
                     log(True, f"[BOT_{self._CHAT_ID}] can't kick user id{user_id} - {str(e)}")
-            with open('bad_words.txt', 'r') as filter:
+            with open('bad_words.txt', 'r', encoding="utf-8", newline='') as filter:
                 flag = False
+                forcheck = message.lower()
                 for word in filter:
                     if flag:
-                        log(False, f"[BOT_{self._CHAT_ID}] bad word detected")
-                        if random.randint(1, 5) == 1:
+                        if random.randint(0, 5) == 1:
                             self.send("За м*т извенись")
                         break
-                    if message.lower().find(word) != -1:
-                        flag = True
+                    else:
+                        if forcheck.find(word[:-1]) != -1:
+                            flag = True
         if self._AWAITING_INPUT_MODE:
             if message == "Назад":
                 self.change_await()
                 self.send("Отменено")
             else:
-                if self._AWAITING_INPUT_MODE == "reminder task":
-                    self.reminder(message, "task")
-                    self.send('Когда напомнить? (время в формате дд.мм.гг чч:мм)')
-                    self.change_await('reminder time')
-                elif self._AWAITING_INPUT_MODE == 'reminder time':
-                    if self.reminder(message, "time"):
-                        self.send("Напоминание установлено<br>Внимание: напоминание не сработает, если бот будет перезагружен")
-                        self.change_await()
-                    else:
-                        self.send("Неверный формат времени, введите время в формате дд.мм.гг чч:мм")
-                elif self._AWAITING_INPUT_MODE == "reminder delete":
-                    if self.reminder(message, "delete"):
-                        self.send("Напоминание удалено")
-                        self.change_await()
-                    else:
-                        self.send("Нет такого напоминания")
-                elif self._AWAITING_INPUT_MODE == "echo":
+                if self._AWAITING_INPUT_MODE == "echo":
                     if message == "!echo off":
                         self.send("Эхо режим выключен")
                         self.change_await()
@@ -326,10 +296,15 @@ class VkBot:
                         self.send(message)
                         log(False, f"[BOT_{self._CHAT_ID}] Answer in echo mode")
         else:
+            if message.lower() == "бот дай денег":
+                self.send("Иди нахуй")
             respond = {'attachment': None, 'text': None}
             message = message.split(' ', 1)
             if message[0] == self._COMMANDS[0]:
-                respond['attachment'] = self.random_image()
+                if(config.random_image_command):
+                    respond['attachment'] = self.random_image()
+                else:
+                    respond['text'] = errors_array["command_off"]
 
             elif message[0] == self._COMMANDS[1]:
                 respond['text'] = "Ваш ид: " + str(user_id)
@@ -353,10 +328,13 @@ class VkBot:
                     respond['text'] = errors_array["miss_argument"]
 
             elif message[0] == self._COMMANDS[6]:
-                try:
-                    respond['text'] = get_weather(message[1])
-                except IndexError:
-                    respond['text'] = errors_array["miss_argument"]
+                if(config.weather_command):
+                    try:
+                        respond['text'] = get_weather(message[1])
+                    except IndexError:
+                        respond['text'] = errors_array["miss_argument"]
+                else:
+                    respond['text'] = errors_array["command_off"]
 
             elif message[0] == self._COMMANDS[7]:
                 try:
@@ -380,7 +358,7 @@ class VkBot:
                     respond['text'] = errors_array["miss_argument"]
 
             elif message[0] == self._COMMANDS[11]:
-                if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
+                if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
                     try:
                         respond['text'] = self.debug(message[1])
                     except IndexError:
@@ -389,7 +367,7 @@ class VkBot:
                     respond["text"] = errors_array["access"]
 
             elif message[0] == self._COMMANDS[12]:
-                if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
+                if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
                     if self._MIDNIGHT_EVENT:
                         self.change_midnight(False)
                         self.send("Уведомление о миднайте выключено")
@@ -402,7 +380,7 @@ class VkBot:
                     respond['text'] = errors_array["access"]
 
             elif message[0] == self._COMMANDS[13]:
-                if int(user_id) == int(owner_id):
+                if int(user_id) == int(config.owner_id):
                     try:
                         if message[1] == "owner":
                             respond['text'] = "Теперь некоторыми командами может пользоваться только владелец бота"
@@ -419,27 +397,15 @@ class VkBot:
                     respond['text'] = errors_array["access"]
 
             elif message[0] == self._COMMANDS[14]:
-                if self._OWNER or int(user_id) == int(owner_id):
+                if self._OWNER or int(user_id) == int(config.owner_id):
                     self.send("Бот выключается")
                     exit(log(False, "[SHUTDOWN]"))
 
             elif message[0] == self._COMMANDS[15]:
-                try:
-                    if message[1] == "list":
-                        respond['text'] = self.reminder(None, "list")
-                    elif message[1] == "set":
-                        self.send("О чём мне вам напомнить? (Введите \"Назад\", чтобы отменить установку)")
-                        self.change_await("reminder task")
-                    elif message[1] == "delete":                        
-                        self.send(f"Введите название напоминания, которое необходимо удалить или \"Назад\", чтобы отменить удаление<br>{self.reminder(None, 'list')}")
-                        self.change_await("reminder delete")
-                    else:
-                        respond['text'] = "Неверный аргумент"
-                except IndexError:
-                    respond["text"] = errors_array['miss_argument']
+                respond['text'] = "Функция удалена за ненадобнастью"
             
             elif message[0] == self._COMMANDS[16]:
-                if self._ACCESS_LEVEL or int(user_id) == int(owner_id):
+                if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
                     if self._NEW_POST:
                         self.change_new_post(False)
                         self.send("Уведомление о новом посте выключено")
@@ -463,11 +429,11 @@ class VkBot:
             elif message[0] == self._COMMANDS[18]:
                 if int(self._CHAT_ID) <= 2000000000:
                     respond['text'] = "Данный чат не является беседой"
-                elif int(user_id) != int(owner_id):
+                elif int(user_id) != int(config.owner_id):
                     respond['text'] = errors_array["access"]
                 else:
                     try:
-                        vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": group_id})
+                        config.vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": config.group_id})
                         if self._ADMIN_MODE:
                             respond["text"] = "Режим модерирования выключен"
                             self.change_admin_mode(False)
@@ -515,16 +481,6 @@ class VkBot:
             else:
                 answer = "Никто не пользуется !game"
             return answer
-        elif arg == "tasks":
-            if self._OWNER:
-                tasks = db.get_all_tasks()
-                if len(tasks) > 0:
-                    answer = "Напоминания в !reminder"
-                    for i in tasks:
-                        answer += f"<br>id{i['chat_id']} - {i['time']}: {i['task']}"
-                else:
-                    answer = "Никто не пользуется !reminder"
-            return answer
         else:
             up_time = time.time() - debug_array['start_time']
             time_d = int(up_time) / (3600 * 24)
@@ -543,43 +499,15 @@ class VkBot:
                 len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
             return answer
 
-    def reminder(self, string, stage):
-        if stage == "task":
-            self._SET_UP_REMINDER['task'] = string
-            return True
-        elif stage == "time":
-            try:
-                datetime_object = time.strptime(string, '%d.%m.%y %H:%M')
-                self._SET_UP_REMINDER['time'] = int(time.mktime(datetime_object))
-                db.set_new_task(self._CHAT_ID, self._SET_UP_REMINDER['time'], self._SET_UP_REMINDER["task"])
-                log(False, f"[BOT_{self._CHAT_ID}] New reminder set")
-                return True
-            except ValueError:
-                return False
-        elif stage == "remind":
-            self.send(f"Пришло время вам напомнить: {string}")
-            log(False, f"[BOT_{self._CHAT_ID}] Reminder worked")
-            return True
-        elif stage == "list":
-            tasks = db.get_from_tasks(self._CHAT_ID)
-            print(tasks)
-            if len(tasks) == 0:
-                respond = "У вас не установлено ни одно напоминание"
-            else:
-                respond = 'Установленные напоминания:<br>'
-                for i in tasks:
-                    datetime_time = datetime.datetime.fromtimestamp(int(i['time']))
-                    respond += f"<br>{datetime_time.strftime('%d.%m.%y %H:%M')} - {i['task']}"
-            return respond
-        elif stage == "delete":
-            return db.delete_task(self._CHAT_ID, string)
-
     def game(self, thing, user_id):
         data = db.get_from_users(user_id)
-        if len(data) == 0:
-            create_new_bot_object(user_id)
-            data = db.get_from_users(user_id)
-        d = data[0]
+        if (config.use_database):
+            if len(data) == 0:
+                create_new_bot_object(user_id)
+                data = db.get_from_users(user_id)
+            d = data[0]
+        else:
+            d = data
         if thing == "статистика":
             try:
                 winrate = (d['game_wins']/(d['game_wins']+d['game_defeats']+d['game_draws'])) * 100
@@ -624,7 +552,7 @@ class VkBot:
 
     def get_info_user(self, id):
         try:
-            user_info = vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
+            user_info = config.vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
         except vk_api.exceptions.ApiError as lol:
             err = "Method users.get: " + str(lol)
             log(True, err)
@@ -675,7 +603,7 @@ class VkBot:
 
     def get_info_group(self, id):
         try:
-            group_info = vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
+            group_info = config.vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
         except vk_api.exceptions.ApiError as lol:
             err = "Method groups.getById: " + str(lol)
             log(True, err)
@@ -691,9 +619,9 @@ class VkBot:
         return answer
 
     def random_image(self):
-        group = "-" + str(group_id)
-        random_images_query = vk_mda.method('photos.get',
-                                            {'owner_id': group, 'album_id': album_for_command, 'count': 1000})
+        group = "-" + str(config.group_id)
+        random_images_query = config.vk_mda.method('photos.get',
+                                            {'owner_id': group, 'album_id': config.album_for_command, 'count': 1000})
         info = "Method photos.get: " + str(random_images_query['count']) + " photos received"
         log(False, info)
         random_number = random.randrange(random_images_query['count'])
@@ -756,7 +684,7 @@ class VkBot:
     def send(self, message=None, attachment=None):
         try:
             random_id = random.randint(-9223372036854775808, 9223372036854775807)
-            message = vk.method('messages.send',
+            message = config.vk.method('messages.send',
                                 {'peer_id': self._CHAT_ID, 'message': message, 'random_id': random_id,
                                 'attachment': attachment})
             log(False, f'[BOT_{self._CHAT_ID}] id: {message}, random_id: {random_id}')
@@ -818,25 +746,10 @@ def midnight():
             log(False, "[EVENT_ENDED] \"Midnight\"")
             time.sleep(1)
         else:
-            time.sleep(0.50)
-
-def check_tasks():
-    while True:
-        try:
-            tasks = db.get_all_tasks()
-            for i in tasks:
-                current_time = time.time()+10800
-                if i['time'] == int(current_time):
-                    bot[i['chat_id']].reminder(i['task'], "remind")
-                    db.delete_task(i["chat_id"], i['task'])
-        except RuntimeError:
-            continue
-        time.sleep(0.4)           
+            time.sleep(0.50)         
 
 load_users()
 tread_bots = threading.Thread(target=bots)
 tread_midnight = threading.Thread(target=midnight, daemon=True)
-tread_tasks = threading.Thread(target=check_tasks, daemon=True)
 tread_bots.start()
 tread_midnight.start()
-tread_tasks.start()
