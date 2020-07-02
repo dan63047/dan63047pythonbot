@@ -45,20 +45,12 @@
 
 Создадим файл конфигурации для бота: В pythonanywhere тыкаем на *Files*, переходим в директорию *dan63047pythonbot* и создаём там новый фаил с названием `config.py`. В нём должно быть написано следующее:
 ```python
-import vk_api
-import pyowm
-from pyowm.utils.config import get_default_config
-vk = vk_api.VkApi(token="vk_group_token") # Токен сообщества
+vk_group_token = "vk_group_token" # Токен сообщества
 group_id = 190322075 # Цифровой ид группы
 owner_id = 276193568 # Цифровой ид вашей страницы вк, чтобы вы могли управлять ботом в переписке
-random_image_command = True # False, если вам не нужна команда !image, иначе следующие 2 строки обязательны
-vk_mda = vk_api.VkApi(token="vk_service_token") # Сервисный ключ доступа
-album_for_command = 269199619 # Цифровой ид альбома для команды !image
-weather_command = True # False, если вам не нужна команда !weather, иначе следующие 4 строки обязательны
-owm_dict = get_default_config()
-owm_dict['language'] = 'ru'
-owm = pyowm.OWM('openweathermap_api_key', language='ru') # Ключ OpenWeather API
-mgr = owm.weather_manager()
+vk_service_token = "vk_service_token" # Сервисный ключ доступа для команды !image. Оставьте None, если хотите выключить эту команду
+album_for_command = 269199619 # Цифровой ид альбома для команды !image. Оставьте None, если хотите выключить эту команду
+openweathermap_api_key = 'openweathermap_api_key' # Ключ OpenWeather API. Оставьте None, если хотите выключить команду !weather
 use_database = True # False, если вы не планируете использовать MySQL базу данных, иначе следующие 4 строки обязательны
 mysql_host = 'pythonanywhere_nickname.mysql.pythonanywhere-services.com' # ссылка на хост БД. Вместо pythonanywhere_nickname должен быть ваш никнейм на pythonanywhere
 mysql_user = 'pythonanywhere_nickname' # Ваш никнейм на pythonanywhere

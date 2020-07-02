@@ -8,10 +8,12 @@ import random
 import json
 import threading
 import pymysql
-from pymysql.cursors import DictCursor
+import vk_api
 import wikipediaapi as wiki
-from collections import deque
 import config
+from pymysql.cursors import DictCursor
+from pyowm.utils.config import get_default_config
+from collections import deque
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
 root_logger = logging.getLogger()
@@ -24,7 +26,7 @@ except:
     handler = logging.FileHandler(log_path, 'w', 'utf-8')
 handler.setFormatter(logging.Formatter('%(message)s'))
 root_logger.addHandler(handler)
-
+debug_array = {'vk_warnings': 0, 'db_warnings': 0, 'bot_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
 def log(warning, text):
     if warning:
         msg = "[" + str(datetime.datetime.now()) + "] [WARNING] " + text
@@ -37,12 +39,50 @@ def log(warning, text):
         print(msg)
 
 log(False, "Script started")
+try:
+    vk = vk_api.VkApi(token=config.vk_group_token)
+    longpoll = VkBotLongPoll(vk, config.group_id)
+except Exception as e:
+    log(True, "Can't connect to longpull: "+str(e))
+    exit(log(False, "[SHUTDOWN]"))
+
+try:
+    if(config.vk_service_token != None and config.album_for_command):
+        random_image_command = True
+        vk_mda = vk_api.VkApi(token=config.vk_service_token)
+        vk_mda.method('photos.get',{'owner_id': "-"+str(config.group_id), 'album_id': config.album_for_command, 'count': 1000})
+    if(config.album_for_command == None):
+        log(False, "Album id for !image is not setted, command will be turned off")
+    if(config.vk_service_token == None):
+        random_image_command = False
+        log(False, "Service token is 'None', !image command will be turned off")
+except vk_api.ApiError:
+    random_image_command = False
+    log(True, "Invalid service token, !image command will be turned off")
+except AttributeError:
+    random_image_command = False
+    log(True, "Service token or album id not found, !image command will be turned off")
+
+try:
+    if(config.openweathermap_api_key != None):
+        owm_dict = get_default_config()
+        owm_dict['language'] = 'ru'
+        owm = pyowm.OWM(config.openweathermap_api_key, owm_dict)
+        mgr = owm.weather_manager()
+        mgr.weather_at_place("Минск")
+        weather_command = True
+    else:
+        log(False, "OpenWeatherMap API key is 'None', !weather command will be turned off")
+        weather_command = False
+except AttributeError:
+    weather_command = False
+    log(True, "OpenWeatherMap API key not found, !image command will be turned off")
+except Exception:
+    weather_command = False
+    log(True, "Invalid OpenWeatherMap API key, !weather command will be turned off")
 
 bot = {}
-debug_array = {'vk_warnings': 0, 'db_warnings': 0, 'bot_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
 errors_array = {"access": "Отказано в доступе", "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
-
-longpoll = VkBotLongPoll(config.vk, config.group_id)
 
 class Database_worker():
     
@@ -206,7 +246,7 @@ def create_new_bot_object(chat_id):
 
 def get_weather(place):
     try:
-        weather_request = config.mgr.weather_at_place(place)
+        weather_request = mgr.weather_at_place(place)
     except Exception as i:
         err = "A problem with OpenWeather API: " + str(i)
         log(True, err)
@@ -250,7 +290,10 @@ class VkBot:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
 
             midnight_text = ["Миднайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!", "00:00"]
-            self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}<br>Картинка дня:", self.random_image())
+            if(random_image_command):
+                self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}<br>Картинка дня:", self.random_image())
+            else:
+                self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}")
             log(False, f"[BOT_{self._CHAT_ID}] Notified about midnight")
         elif event == "post" and self._NEW_POST:
             post = f"wall{str(something['from_id'])}_{str(something['id'])}"
@@ -265,7 +308,7 @@ class VkBot:
                 self.send(f"[@id{user_id}|Дебил]")
                 try:
                     if int(user_id) != int(config.owner_id):
-                        config.vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
+                        vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
                         log(False, f"[BOT_{self._CHAT_ID}] user id{user_id} has been kicked")
                     else:
                         log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
@@ -301,7 +344,7 @@ class VkBot:
             respond = {'attachment': None, 'text': None}
             message = message.split(' ', 1)
             if message[0] == self._COMMANDS[0]:
-                if(config.random_image_command):
+                if(random_image_command):
                     respond['attachment'] = self.random_image()
                 else:
                     respond['text'] = errors_array["command_off"]
@@ -328,7 +371,7 @@ class VkBot:
                     respond['text'] = errors_array["miss_argument"]
 
             elif message[0] == self._COMMANDS[6]:
-                if(config.weather_command):
+                if(weather_command):
                     try:
                         respond['text'] = get_weather(message[1])
                     except IndexError:
@@ -433,7 +476,7 @@ class VkBot:
                     respond['text'] = errors_array["access"]
                 else:
                     try:
-                        config.vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": config.group_id})
+                        vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": config.group_id})
                         if self._ADMIN_MODE:
                             respond["text"] = "Режим модерирования выключен"
                             self.change_admin_mode(False)
@@ -552,7 +595,7 @@ class VkBot:
 
     def get_info_user(self, id):
         try:
-            user_info = config.vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
+            user_info = vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
         except vk_api.exceptions.ApiError as lol:
             err = "Method users.get: " + str(lol)
             log(True, err)
@@ -603,7 +646,7 @@ class VkBot:
 
     def get_info_group(self, id):
         try:
-            group_info = config.vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
+            group_info = vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
         except vk_api.exceptions.ApiError as lol:
             err = "Method groups.getById: " + str(lol)
             log(True, err)
@@ -620,7 +663,7 @@ class VkBot:
 
     def random_image(self):
         group = "-" + str(config.group_id)
-        random_images_query = config.vk_mda.method('photos.get',
+        random_images_query = vk_mda.method('photos.get',
                                             {'owner_id': group, 'album_id': config.album_for_command, 'count': 1000})
         info = "Method photos.get: " + str(random_images_query['count']) + " photos received"
         log(False, info)
@@ -684,7 +727,7 @@ class VkBot:
     def send(self, message=None, attachment=None):
         try:
             random_id = random.randint(-9223372036854775808, 9223372036854775807)
-            message = config.vk.method('messages.send',
+            message = vk.method('messages.send',
                                 {'peer_id': self._CHAT_ID, 'message': message, 'random_id': random_id,
                                 'attachment': attachment})
             log(False, f'[BOT_{self._CHAT_ID}] id: {message}, random_id: {random_id}')
