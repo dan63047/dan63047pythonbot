@@ -26,7 +26,10 @@ except:
     handler = logging.FileHandler(log_path, 'w', 'utf-8')
 handler.setFormatter(logging.Formatter('%(message)s'))
 root_logger.addHandler(handler)
-debug_array = {'vk_warnings': 0, 'db_warnings': 0, 'bot_warnings': 0, 'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
+debug_array = {'vk_warnings': 0, 'db_warnings': 0, 'bot_warnings': 0,
+               'logger_warnings': 0, 'start_time': 0, 'messages_get': 0, 'messages_answered': 0}
+
+
 def log(warning, text):
     if warning:
         msg = "[" + str(datetime.datetime.now()) + "] [WARNING] " + text
@@ -37,6 +40,7 @@ def log(warning, text):
         msg = "[" + str(datetime.datetime.now()) + "] " + text
         logging.info(msg)
         print(msg)
+
 
 log(False, "Script started")
 try:
@@ -50,7 +54,8 @@ try:
     if(config.vk_service_token != None and config.album_for_command):
         random_image_command = True
         vk_mda = vk_api.VkApi(token=config.vk_service_token)
-        vk_mda.method('photos.get',{'owner_id': "-"+str(config.group_id), 'album_id': config.album_for_command, 'count': 1000})
+        vk_mda.method('photos.get', {'owner_id': "-"+str(config.group_id),
+                                     'album_id': config.album_for_command, 'count': 1000})
     if(config.album_for_command == None):
         log(False, "Album id for !image is not setted, command will be turned off")
     if(config.vk_service_token == None):
@@ -82,19 +87,21 @@ except Exception:
     log(True, "Invalid OpenWeatherMap API key, !weather command will be turned off")
 
 bot = {}
-errors_array = {"access": "Отказано в доступе", "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
+errors_array = {"access": "Отказано в доступе",
+                "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
+
 
 class Database_worker():
-    
+
     def __init__(self):
         if(config.use_database):
             log(False, "Trying to connect to database")
             try:
                 self._CON = pymysql.connect(
-                    host= config.mysql_host,
-                    user= config.mysql_user,
-                    password= config.mysql_pass,
-                    db= config.mysql_db,
+                    host=config.mysql_host,
+                    user=config.mysql_user,
+                    password=config.mysql_pass,
+                    db=config.mysql_db,
                     charset='utf8mb4',
                     cursorclass=DictCursor
                 )
@@ -117,22 +124,23 @@ class Database_worker():
             except Exception:
                 log(True, "data.json is not exist, it will be created soon")
                 self._DATA_DIST = {"users": {}}
-            
+
     def set_new_user(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False, game_wins=0, game_defeats=0, game_draws=0):
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute("INSERT INTO bot_users (chat_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)", (peer_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws))
+                cur.execute("INSERT INTO bot_users (chat_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                            (peer_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws))
                 self._CON.commit()
                 cur.close()
             except Exception as e:
                 debug_array['db_warnings'] += 1
                 log(True, f"Unable to add new user in database: {str(e)}")
         else:
-            self._DATA_DIST['users'][peer_id] = {"awaiting": awaiting, "access": access, "midnight": midnight, "new_post": new_post, "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws}
+            self._DATA_DIST['users'][peer_id] = {"awaiting": awaiting, "access": access, "midnight": midnight, "new_post": new_post,
+                                                 "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws}
             open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
-    
     def get_all_users(self):
         if(config.use_database):
             try:
@@ -151,7 +159,8 @@ class Database_worker():
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute("SELECT * FROM bot_users WHERE chat_id = %s", (from_id))
+                cur.execute(
+                    "SELECT * FROM bot_users WHERE chat_id = %s", (from_id))
                 result = cur.fetchall()
                 cur.close()
                 return result
@@ -165,7 +174,8 @@ class Database_worker():
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute("SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
+                cur.execute(
+                    "SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
                 result = cur.fetchall()
                 cur.close()
                 return result
@@ -175,17 +185,19 @@ class Database_worker():
         else:
             return self._DATA_DIST['users']
             # Info: dist cannot return only the necessary keys
-    
+
     def update_user(self, chat_id, thing, new_value):
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute(f"UPDATE bot_users SET {thing} = %s WHERE bot_users.chat_id = %s;", (new_value, chat_id))
+                cur.execute(
+                    f"UPDATE bot_users SET {thing} = %s WHERE bot_users.chat_id = %s;", (new_value, chat_id))
                 self._CON.commit()
                 cur.close()
             except Exception as e:
                 debug_array['db_warnings'] += 1
-                log(True, f"Unable to update info about user in database: {str(e)}")
+                log(True,
+                    f"Unable to update info about user in database: {str(e)}")
         else:
             self._DATA_DIST['users'][str(chat_id)][thing] = new_value
             open("data.json", "w").write(json.dumps(self._DATA_DIST))
@@ -194,7 +206,8 @@ class Database_worker():
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute("DELETE FROM bot_users, game_defeats WHERE chat_id = %s", (chat_id))
+                cur.execute(
+                    "DELETE FROM bot_users, game_defeats WHERE chat_id = %s", (chat_id))
                 self._CON.commit()
                 cur.close()
                 return True
@@ -206,7 +219,9 @@ class Database_worker():
             self._DATA_DIST['users'].pop(str(chat_id))
             open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
+
 db = Database_worker()
+
 
 def load_users():
     try:
@@ -214,10 +229,12 @@ def load_users():
         get_info = db.get_all_users()
         if(config.use_database):
             for i in get_info:
-                bot[int(i['chat_id'])] = VkBot(int(i['chat_id']), bool(i['midnight']), i['awaiting'], int(i['access']), bool(i['new_post']), bool(i['admin_mode']))
+                bot[int(i['chat_id'])] = VkBot(int(i['chat_id']), bool(i['midnight']), i['awaiting'], int(
+                    i['access']), bool(i['new_post']), bool(i['admin_mode']))
         else:
             for i in get_info:
-                bot[int(i)] = VkBot(int(i), bool(get_info[i]['midnight']), get_info[i]['awaiting'], int(get_info[i]['access']), bool(get_info[i]['new_post']), bool(get_info[i]['admin_mode']))
+                bot[int(i)] = VkBot(int(i), bool(get_info[i]['midnight']), get_info[i]['awaiting'], int(
+                    get_info[i]['access']), bool(get_info[i]['new_post']), bool(get_info[i]['admin_mode']))
     except Exception as lol:
         debug_array['bot_warnings'] += 1
         log(True, f"Problem with creating objects: {str(lol)}")
@@ -240,9 +257,11 @@ class MyVkLongPoll(VkBotLongPoll):
                 time.sleep(15)
                 continue
 
+
 def create_new_bot_object(chat_id):
     bot[chat_id] = VkBot(chat_id)
     db.set_new_user(chat_id)
+
 
 def get_weather(place):
     try:
@@ -289,11 +308,14 @@ class VkBot:
         if event == "midnight" and self._MIDNIGHT_EVENT:
             current_time = datetime.datetime.fromtimestamp(time.time() + 10800)
 
-            midnight_text = ["Миднайт!", "Полночь!", "Midnight!", "миднигхт", "Середина ночи", "Смена даты!", "00:00"]
+            midnight_text = ["Миднайт!", "Полночь!", "Midnight!",
+                             "миднигхт", "Середина ночи", "Смена даты!", "00:00"]
             if(random_image_command):
-                self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}<br>Картинка дня:", self.random_image())
+                self.send(
+                    f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}<br>Картинка дня:", self.random_image())
             else:
-                self.send(f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}")
+                self.send(
+                    f"{random.choice(midnight_text)}<br>Наступило {current_time.strftime('%d.%m.%Y')}")
             log(False, f"[BOT_{self._CHAT_ID}] Notified about midnight")
         elif event == "post" and self._NEW_POST:
             post = f"wall{str(something['from_id'])}_{str(something['id'])}"
@@ -308,12 +330,15 @@ class VkBot:
                 self.send(f"[@id{user_id}|Дебил]")
                 try:
                     if int(user_id) != int(config.owner_id):
-                        vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": user_id})
-                        log(False, f"[BOT_{self._CHAT_ID}] user id{user_id} has been kicked")
+                        vk.method("messages.removeChatUser", {"chat_id": int(
+                            self._CHAT_ID)-2000000000, "member_id": user_id})
+                        log(False,
+                            f"[BOT_{self._CHAT_ID}] user id{user_id} has been kicked")
                     else:
                         log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
                 except Exception as e:
-                    log(True, f"[BOT_{self._CHAT_ID}] can't kick user id{user_id} - {str(e)}")
+                    log(True,
+                        f"[BOT_{self._CHAT_ID}] can't kick user id{user_id} - {str(e)}")
             with open('bad_words.txt', 'r', encoding="utf-8", newline='') as filter:
                 flag = False
                 forcheck = message.lower()
@@ -325,6 +350,14 @@ class VkBot:
                     else:
                         if forcheck.find(word[:-1]) != -1:
                             flag = True
+            if event.message.action:
+                action = event.message.action
+                if action['type'] == 'chat_invite_user' or action['type'] == 'chat_invite_user_by_link':
+                    user_info = vk.method('users.get', {'user_ids': action["member_id"], 'fields': 'verified,last_seen,sex'})
+                    self.send(f'Добро пожаловать в беседу, {user_info[0]["first_name"]} {user_info[0]["last_name"]}')
+                elif action['type'] == 'chat_kick_user':
+                    user_info = vk.method('users.get', {'user_ids': action["member_id"], 'fields': 'verified,last_seen,sex'})
+                    self.send(f'{user_info[0]["first_name"]} {user_info[0]["last_name"]} покинул беседу')
         if self._AWAITING_INPUT_MODE:
             if message == "Назад":
                 self.change_await()
@@ -337,7 +370,8 @@ class VkBot:
                         log(False, f"[BOT_{self._CHAT_ID}] Out from echo mode")
                     else:
                         self.send(message)
-                        log(False, f"[BOT_{self._CHAT_ID}] Answer in echo mode")
+                        log(False,
+                            f"[BOT_{self._CHAT_ID}] Answer in echo mode")
         else:
             if message.lower() == "бот дай денег":
                 self.send("Иди нахуй")
@@ -414,11 +448,13 @@ class VkBot:
                     if self._MIDNIGHT_EVENT:
                         self.change_midnight(False)
                         self.send("Уведомление о миднайте выключено")
-                        log(False, f"[BOT_{self._CHAT_ID}] Unsubscribed from event \"Midnight\"")
+                        log(False,
+                            f"[BOT_{self._CHAT_ID}] Unsubscribed from event \"Midnight\"")
                     else:
                         self.change_midnight(True)
                         self.send("Бот будет уведомлять вас о каждом миднайте")
-                        log(False, f"[BOT_{self._CHAT_ID}] Subscribed on event \"Midnight\"")
+                        log(False,
+                            f"[BOT_{self._CHAT_ID}] Subscribed on event \"Midnight\"")
                 else:
                     respond['text'] = errors_array["access"]
 
@@ -435,7 +471,8 @@ class VkBot:
                             respond['text'] = "Некорректный аргумент"
                     except IndexError:
                         respond['text'] = errors_array["miss_argument"]
-                    log(False, f"[BOT_{self._CHAT_ID}] Access level changed on {self._ACCESS_LEVEL}")
+                    log(False,
+                        f"[BOT_{self._CHAT_ID}] Access level changed on {self._ACCESS_LEVEL}")
                 else:
                     respond['text'] = errors_array["access"]
 
@@ -446,27 +483,32 @@ class VkBot:
 
             elif message[0] == self._COMMANDS[15]:
                 respond['text'] = "Функция удалена за ненадобнастью"
-            
+
             elif message[0] == self._COMMANDS[16]:
                 if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
                     if self._NEW_POST:
                         self.change_new_post(False)
                         self.send("Уведомление о новом посте выключено")
-                        log(False, f"[BOT_{self._CHAT_ID}] Unsubscribed from new posts")
+                        log(False,
+                            f"[BOT_{self._CHAT_ID}] Unsubscribed from new posts")
                     else:
                         self.change_new_post(True)
-                        self.send("Бот будет уведомлять вас о каждом новом посте")
-                        log(False, f"[BOT_{self._CHAT_ID}] Subscribed on new posts")
+                        self.send(
+                            "Бот будет уведомлять вас о каждом новом посте")
+                        log(False,
+                            f"[BOT_{self._CHAT_ID}] Subscribed on new posts")
                 else:
                     respond['text'] = errors_array["access"]
-            
+
             elif message[0] == self._COMMANDS[17]:
                 try:
                     message[1] = message[1].split(' ', 1)
                     try:
-                        respond['text'] = self.random_number(int(message[1][0]), int(message[1][1]))
+                        respond['text'] = self.random_number(
+                            int(message[1][0]), int(message[1][1]))
                     except:
-                        respond['text'] = self.random_number(0, int(message[1][0]))
+                        respond['text'] = self.random_number(
+                            0, int(message[1][0]))
                 except:
                     respond['text'] = self.random_number(0, 10)
             elif message[0] == self._COMMANDS[18]:
@@ -476,18 +518,21 @@ class VkBot:
                     respond['text'] = errors_array["access"]
                 else:
                     try:
-                        vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": config.group_id})
+                        vk.method("messages.getConversationMembers", {
+                                  "peer_id": int(self._CHAT_ID), "group_id": config.group_id})
                         if self._ADMIN_MODE:
                             respond["text"] = "Режим модерирования выключен"
                             self.change_admin_mode(False)
-                            log(False, f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
+                            log(False,
+                                f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
                         else:
                             respond["text"] = "Режим модерирования включён"
                             self.change_admin_mode(True)
-                            log(False, f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
+                            log(False,
+                                f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
                     except Exception:
                         respond["text"] = "У меня нет прав администратора"
-                    
+
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
 
@@ -517,7 +562,8 @@ class VkBot:
                 answer = "Статистика игроков в !game"
                 for i in stats:
                     try:
-                        winrate = (i['game_wins']/(i['game_wins']+i['game_defeats']+i['game_draws'])) * 100
+                        winrate = (i['game_wins']/(i['game_wins'] +
+                                                   i['game_defeats']+i['game_draws'])) * 100
                     except ZeroDivisionError:
                         winrate = 0
                     answer += f"<br> @id{i['chat_id']} - Сыграл раз: {i['game_wins']+i['game_defeats']+i['game_draws']}, Победы/Ничьи/Поражения: {i['game_wins']}/{i['game_draws']}/{i['game_defeats']}, {toFixed(winrate, 2)}% побед"
@@ -528,10 +574,14 @@ class VkBot:
             up_time = time.time() - debug_array['start_time']
             time_d = int(up_time) / (3600 * 24)
             time_h = int(up_time) / 3600 - int(time_d) * 24
-            time_min = int(up_time) / 60 - int(time_h) * 60 - int(time_d) * 24 * 60
-            time_sec = int(up_time) - int(time_min) * 60 - int(time_h) * 3600 - int(time_d) * 24 * 60 * 60
-            str_up_time = '%01d:%02d:%02d:%02d' % (time_d, time_h, time_min, time_sec)
-            datetime_time = datetime.datetime.fromtimestamp(debug_array['start_time'])
+            time_min = int(up_time) / 60 - int(time_h) * \
+                60 - int(time_d) * 24 * 60
+            time_sec = int(up_time) - int(time_min) * 60 - \
+                int(time_h) * 3600 - int(time_d) * 24 * 60 * 60
+            str_up_time = '%01d:%02d:%02d:%02d' % (
+                time_d, time_h, time_min, time_sec)
+            datetime_time = datetime.datetime.fromtimestamp(
+                debug_array['start_time'])
             answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
                 debug_array['messages_get']) + "<br>Отправлено сообщений: " + str(
                 debug_array['messages_answered']) + "<br>Ошибок в работе: " + str(
@@ -553,7 +603,8 @@ class VkBot:
             d = data
         if thing == "статистика":
             try:
-                winrate = (d['game_wins']/(d['game_wins']+d['game_defeats']+d['game_draws'])) * 100
+                winrate = (d['game_wins']/(d['game_wins'] +
+                                           d['game_defeats']+d['game_draws'])) * 100
             except ZeroDivisionError:
                 winrate = 0
             return f"Камень, ножницы, бумага<br>Сыграно игр: {d['game_wins']+d['game_defeats']+d['game_draws']}<br>Из них:<br>•Побед: {d['game_wins']}<br>•Поражений: {d['game_defeats']}<br>•Ничей: {d['game_draws']}<br>Процент побед: {toFixed(winrate, 2)}%"
@@ -595,7 +646,8 @@ class VkBot:
 
     def get_info_user(self, id):
         try:
-            user_info = vk.method('users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
+            user_info = vk.method(
+                'users.get', {'user_ids': id, 'fields': 'verified,last_seen,sex'})
         except vk_api.exceptions.ApiError as lol:
             err = "Method users.get: " + str(lol)
             log(True, err)
@@ -636,17 +688,20 @@ class VkBot:
         else:
             platform = "тип платформы неизвестен"
 
-        time = datetime.datetime.fromtimestamp(user_info[0]['last_seen']['time'])
+        time = datetime.datetime.fromtimestamp(
+            user_info[0]['last_seen']['time'])
 
         answer = user_info[0]['first_name'] + " " + user_info[0]['last_name'] + "<br>Его ид: " + \
-                 str(user_info[0]['id']) + "<br>Профиль закрыт: " + is_closed + "<br>Пол: " + sex \
-                 + "<br>Последний онлайн: " + time.strftime('%d.%m.%Y в %H:%M:%S') + " (" + platform + ")"
+            str(user_info[0]['id']) + "<br>Профиль закрыт: " + is_closed + "<br>Пол: " + sex \
+            + "<br>Последний онлайн: " + \
+            time.strftime('%d.%m.%Y в %H:%M:%S') + " (" + platform + ")"
 
         return answer
 
     def get_info_group(self, id):
         try:
-            group_info = vk.method('groups.getById', {'group_id': id, 'fields': 'description,members_count'})
+            group_info = vk.method(
+                'groups.getById', {'group_id': id, 'fields': 'description,members_count'})
         except vk_api.exceptions.ApiError as lol:
             err = "Method groups.getById: " + str(lol)
             log(True, err)
@@ -665,7 +720,8 @@ class VkBot:
         group = "-" + str(config.group_id)
         random_images_query = vk_mda.method('photos.get',
                                             {'owner_id': group, 'album_id': config.album_for_command, 'count': 1000})
-        info = "Method photos.get: " + str(random_images_query['count']) + " photos received"
+        info = "Method photos.get: " + \
+            str(random_images_query['count']) + " photos received"
         log(False, info)
         random_number = random.randrange(random_images_query['count'])
         return "photo" + str(random_images_query['items'][random_number]['owner_id']) + "_" + str(
@@ -707,7 +763,7 @@ class VkBot:
     def change_await(self, awaiting=None):
         self._AWAITING_INPUT_MODE = awaiting
         db.update_user(self._CHAT_ID, "awaiting", self._AWAITING_INPUT_MODE)
-    
+
     def change_access(self, level):
         self._ACCESS_LEVEL = level
         db.update_user(self._CHAT_ID, "access", self._ACCESS_LEVEL)
@@ -715,26 +771,28 @@ class VkBot:
     def change_new_post(self, new_post):
         self._NEW_POST = new_post
         db.update_user(self._CHAT_ID, "new_post", self._NEW_POST)
-    
+
     def change_midnight(self, midnight):
         self._MIDNIGHT_EVENT = midnight
         db.update_user(self._CHAT_ID, "midnight", self._MIDNIGHT_EVENT)
-    
+
     def change_admin_mode(self, admin_mode):
         self._ADMIN_MODE = admin_mode
         db.update_user(self._CHAT_ID, "admin_mode", self._ADMIN_MODE)
 
     def send(self, message=None, attachment=None):
         try:
-            random_id = random.randint(-9223372036854775808, 9223372036854775807)
+            random_id = random.randint(-9223372036854775808,
+                                       9223372036854775807)
             message = vk.method('messages.send',
                                 {'peer_id': self._CHAT_ID, 'message': message, 'random_id': random_id,
-                                'attachment': attachment})
-            log(False, f'[BOT_{self._CHAT_ID}] id: {message}, random_id: {random_id}')
+                                 'attachment': attachment})
+            log(False,
+                f'[BOT_{self._CHAT_ID}] id: {message}, random_id: {random_id}')
             debug_array['messages_answered'] += 1
         except Exception as e:
             log(True, f'Failed to send message: {str(e)}')
-        
+
 
 def bots():
     log(False, "Started listening longpull server")
@@ -743,6 +801,8 @@ def bots():
         try:
             if event.type == VkBotEventType.MESSAGE_NEW:
                 log_msg = f'[MESSAGE] id: {event.message.id}, peer_id: {event.message.peer_id}, user_id: {event.message.from_id}'
+                if event.message.action:
+                    log_msg += f', action: '+event.message.action["type"]+', user id in action: '+ str(event.message.action["member_id"])
                 if event.message.text != "":
                     log_msg += f', text: "{event.message.text}"'
                 if event.message.attachments:
@@ -751,9 +811,11 @@ def bots():
                         if i['type'] == "sticker":
                             atch += f"sticker_id{i[i['type']]['sticker_id']}"
                         elif i['type'] == "wall":
-                            atch += i['type'] + str(i[i['type']]['from_id']) + "_" + str(i[i['type']]['id']) + " "
+                            atch += i['type'] + str(i[i['type']]['from_id']) + \
+                                "_" + str(i[i['type']]['id']) + " "
                         else:
-                            atch += i['type'] + str(i[i['type']]['owner_id']) + "_" + str(i[i['type']]['id']) + " "
+                            atch += i['type'] + str(i[i['type']]['owner_id']) + \
+                                "_" + str(i[i['type']]['id']) + " "
                     log_msg += atch
                 log(False, log_msg)
                 debug_array['messages_get'] += 1
@@ -771,7 +833,8 @@ def bots():
                     else:
                         bot[int(i)].event("post", event.object)
             elif event.type == VkBotEventType.MESSAGE_DENY:
-                log(False, f"User {event.object.user_id} deny messages from that group")
+                log(False,
+                    f"User {event.object.user_id} deny messages from that group")
                 del bot[int(event.object.user_id)]
                 db.delete_user(event.object.user_id)
             else:
@@ -780,6 +843,7 @@ def bots():
             log(True, f"Беды с ботом: {str(kek)}")
             debug_array['bot_warnings'] += 1
             continue
+
 
 def midnight():
     while True:
@@ -795,7 +859,8 @@ def midnight():
             log(False, "[EVENT_ENDED] \"Midnight\"")
             time.sleep(1)
         else:
-            time.sleep(0.50)         
+            time.sleep(0.50)
+
 
 load_users()
 tread_bots = threading.Thread(target=bots)
