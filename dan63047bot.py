@@ -813,6 +813,8 @@ def bots():
                         elif i['type'] == "wall":
                             atch += i['type'] + str(i[i['type']]['from_id']) + \
                                 "_" + str(i[i['type']]['id']) + " "
+                        elif i['type'] == "link":
+                            atch +=  i['type'] + " " + i[i['type']]['title'] + " "
                         else:
                             atch += i['type'] + str(i[i['type']]['owner_id']) + \
                                 "_" + str(i[i['type']]['id']) + " "
