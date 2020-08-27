@@ -1,18 +1,13 @@
 import vk_api
 import datetime
 import time
-import requests
 import logging
-import pyowm
 import random
 import json
 import threading
-import pymysql
-import vk_api
-import wikipediaapi as wiki
 import config
+import dan63047VKbot
 from pymysql.cursors import DictCursor
-from pyowm.utils.config import get_default_config
 from collections import deque
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
 
@@ -37,7 +32,6 @@ def log(warning, text):
         logging.info(msg)
         print(msg)
 
-log(False, "Script started")
 try:
     vk = vk_api.VkApi(token=config.vk_group_token)
     longpoll = VkBotLongPoll(vk, config.group_id)
@@ -46,8 +40,10 @@ except Exception as e:
     log(True, "Can't connect to longpull: "+str(e))
     exit(log(False, "[SHUTDOWN]"))
 
+
 def cycle():
     active = True
+    dan63047VKbot.load_users()
     print("Welcome to dan63047bot console\nEnter command:")
     while active:
         command = input(">")
@@ -81,7 +77,7 @@ def cycle():
                 log(True, "No arguments")
                 continue
             try:
-                if 1 in command[1]:
+                if len(command[1]) == 2:
                     m = vk.method('messages.getHistory', {'count': command[1][1], 'peer_id': command[1][0]})
                 else:
                     m = vk.method('messages.getHistory', {'peer_id': command[1][0]})
@@ -93,7 +89,7 @@ def cycle():
                         user_info = vk.method('users.get', {'user_ids': i["from_id"], 'fields': 'verified,last_seen,sex'})
                         f = f'{user_info[0]["first_name"]} {user_info[0]["last_name"]}'
                     datetime_time = datetime.datetime.fromtimestamp(i['date'])
-                    date = datetime_time.strftime('%d.%m.%Y в %H:%M:%S')
+                    date = datetime_time.strftime('%d.%m.%Y %H:%M:%S')
                     msg = f"{f} {date}: {i['text']}"
                     if i['attachments']:
                         for m in i['attachments']:
@@ -110,6 +106,51 @@ def cycle():
                     print(msg)
             except Exception as e:
                 log(True, f'Failed to get history: {str(e)}')
+        elif command[0] == "bot":
+            if len(command) == 2:
+                command[1] = command[1].split(' ', 1)
+                if len(command[1]) == 2:
+                    if command[1][0] == "midnight":
+                        try:
+                            userinfo = dan63047VKbot.db.get_from_users(command[1][1])
+                            log(False, "Midnight flag: "+str(userinfo["midnight"]))
+                            dan63047VKbot.bot[int(command[1][1])].event("midnight")
+                        except KeyError as e:
+                            log(True, "Bot object is not exist: "+str(e))
+                    elif command[1][0] == "changeMidnightFlag":
+                        try:
+                            userinfo = dan63047VKbot.db.get_from_users(command[1][1])
+                            if userinfo["midnight"]:
+                                dan63047VKbot.bot[int(command[1][1])].change_flag('midnight', False)
+                            else:
+                                dan63047VKbot.bot[int(command[1][1])].change_flag('midnight', True)
+                            userinfo = dan63047VKbot.db.get_from_users(command[1][1])
+                            log(False, "Midnight flag: "+str(userinfo["midnight"]))
+                        except KeyError as e:
+                            log(True, "Bot object is not exist: "+str(e))
+                    elif command[1][0] == "create":
+                        try:
+                            dan63047VKbot.create_new_bot_object(command[1][1])
+                            log(False, "Bot-object has been created")
+                        except Exception as e:
+                            log(True, "Can't create bot-object - "+str(e))
+                    elif command[1][0] == "delete":
+                        try:
+                            del dan63047VKbot.bot[int(command[1][1])]
+                            dan63047VKbot.db.delete_user(command[1][1])
+                            log(False, "Bot-object has been deleted")
+                        except Exception as e:
+                            log(True, "Can't delete bot-object - "+str(e))
+                else:
+                    if command[1][0] == "update":
+                        dan63047VKbot.load_users()
+            else:
+                if dan63047VKbot.bot:
+                    log(False, f"There is {len(dan63047VKbot.bot)} bot-objects")
+                    for i in dan63047VKbot.bot:
+                        print(dan63047VKbot.bot[i])
+                else:
+                    print("No bot-objects")
         else:
             log(True, "Unknown command. Type 'help' for command list")
 

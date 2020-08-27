@@ -1,3 +1,4 @@
+"""Here you can found Bot class and Database worker class"""
 import vk_api
 import datetime
 import time
@@ -8,7 +9,6 @@ import random
 import json
 import threading
 import pymysql
-import vk_api
 import wikipediaapi as wiki
 import config
 from pymysql.cursors import DictCursor
@@ -41,8 +41,10 @@ def log(warning, text):
         logging.info(msg)
         print(msg)
 
+bot = {}
+errors_array = {"access": "Отказано в доступе",
+                "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
 
-log(False, "Script started")
 try:
     vk = vk_api.VkApi(token=config.vk_group_token)
     longpoll = VkBotLongPoll(vk, config.group_id)
@@ -85,11 +87,6 @@ except AttributeError:
 except Exception:
     weather_command = False
     log(True, "Invalid OpenWeatherMap API key, !weather command will be turned off")
-
-bot = {}
-errors_array = {"access": "Отказано в доступе",
-                "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
-
 
 class Database_worker():
 
@@ -278,13 +275,32 @@ def get_weather(place):
 
 
 class VkBot:
+    """Bot object, which can answer to user commands\n\n
 
-    def __init__(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False):
+    Keyword arguments:\n
+    peer_id -- id of conversation with user for answering. Int\n
+    midnight -- flag of midnight function, which send every midnigtht a message. Defalt: False. Bool\n
+    awaiting -- strind, what show, which function awaiting input. Defalt: None. Str\n
+    access -- flag, what set access level to bot functions. Defalt: True. Bool\n
+    new_post -- flag of notificaton function about new post on group. Defalt: False. Bool\n
+    admin_mode -- flag of moderating function, which moderate conversation. Defalt: False. Bool
+    """
+    
+    def __init__(self, peer_id, midnight=False, awaiting=None, access=True, new_post=False, admin_mode=False):
+        """Initialise the bot object\n\n
 
+        Keyword arguments:\n
+        peer_id -- id of conversation with user for answering. Int\n
+        midnight -- flag of midnight function, which send every midnigtht a message. Defalt: False. Bool\n
+        awaiting -- strind, what show, which function awaiting input. Defalt: None. Str\n
+        access -- flag, what set access level to bot functions. Defalt: True. Bool\n
+        new_post -- flag of notificaton function about new post on group. Defalt: False. Bool\n
+        admin_mode -- flag of moderating function, which moderate conversation. Defalt: False. Bool
+        """
         log(False, f"[BOT_{peer_id}] Created new bot-object")
         self._CHAT_ID = peer_id
         self._AWAITING_INPUT_MODE = awaiting
-        self._ACCESS_LEVEL = access
+        self._ACCESS_TO_ALL = access
         self._SET_UP_REMINDER = {"task": None, "time": None}
         self._MIDNIGHT_EVENT = midnight
         self._NEW_POST = new_post
@@ -299,7 +315,7 @@ class VkBot:
                           "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe", "!random", "!admin_mode"]
 
     def __str__(self):
-        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_LEVEL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}"
+        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_TO_ALL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}"
 
     def __del__(self):
         log(False, f"[BOT_{str(self._CHAT_ID)}] Bot-object has been deleted")
@@ -435,7 +451,7 @@ class VkBot:
                     respond['text'] = errors_array["miss_argument"]
 
             elif message[0] == self._COMMANDS[11]:
-                if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
+                if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     try:
                         respond['text'] = self.debug(message[1])
                     except IndexError:
@@ -444,14 +460,14 @@ class VkBot:
                     respond["text"] = errors_array["access"]
 
             elif message[0] == self._COMMANDS[12]:
-                if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
+                if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     if self._MIDNIGHT_EVENT:
-                        self.change_midnight(False)
+                        self.change_flag('midnight', False)
                         self.send("Уведомление о миднайте выключено")
                         log(False,
                             f"[BOT_{self._CHAT_ID}] Unsubscribed from event \"Midnight\"")
                     else:
-                        self.change_midnight(True)
+                        self.change_flag('midnight', True)
                         self.send("Бот будет уведомлять вас о каждом миднайте")
                         log(False,
                             f"[BOT_{self._CHAT_ID}] Subscribed on event \"Midnight\"")
@@ -463,16 +479,16 @@ class VkBot:
                     try:
                         if message[1] == "owner":
                             respond['text'] = "Теперь некоторыми командами может пользоваться только владелец бота"
-                            self.change_access(0)
+                            self.change_flag('admin_mode', False)
                         elif message[1] == "all":
                             respond['text'] = "Теперь все могут пользоваться всеми командами"
-                            self.change_access(1)
+                            self.change_flag('admin_mode', True)
                         else:
                             respond['text'] = "Некорректный аргумент"
                     except IndexError:
                         respond['text'] = errors_array["miss_argument"]
                     log(False,
-                        f"[BOT_{self._CHAT_ID}] Access level changed on {self._ACCESS_LEVEL}")
+                        f"[BOT_{self._CHAT_ID}] Access level changed on {self._ACCESS_TO_ALL}")
                 else:
                     respond['text'] = errors_array["access"]
 
@@ -485,14 +501,14 @@ class VkBot:
                 respond['text'] = "Функция удалена за ненадобнастью"
 
             elif message[0] == self._COMMANDS[16]:
-                if self._ACCESS_LEVEL or int(user_id) == int(config.owner_id):
+                if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     if self._NEW_POST:
-                        self.change_new_post(False)
+                        self.change_flag('new_post', False)
                         self.send("Уведомление о новом посте выключено")
                         log(False,
                             f"[BOT_{self._CHAT_ID}] Unsubscribed from new posts")
                     else:
-                        self.change_new_post(True)
+                        self.change_flag('new_post', True)
                         self.send(
                             "Бот будет уведомлять вас о каждом новом посте")
                         log(False,
@@ -522,12 +538,12 @@ class VkBot:
                                   "peer_id": int(self._CHAT_ID), "group_id": config.group_id})
                         if self._ADMIN_MODE:
                             respond["text"] = "Режим модерирования выключен"
-                            self.change_admin_mode(False)
+                            self.change_flag('admin_mode', False)
                             log(False,
                                 f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
                         else:
                             respond["text"] = "Режим модерирования включён"
-                            self.change_admin_mode(True)
+                            self.change_flag('admin_mode', True)
                             log(False,
                                 f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
                     except Exception:
@@ -761,26 +777,41 @@ class VkBot:
         return f"Рандомное число от {lower} до {higher}:<br>{r}"
 
     def change_await(self, awaiting=None):
+        """Change the awaiting input state
+
+        Keyword arguments:
+        awaiting -- name of function, what awaiting input from user. Defalt: None. String
+        """
         self._AWAITING_INPUT_MODE = awaiting
         db.update_user(self._CHAT_ID, "awaiting", self._AWAITING_INPUT_MODE)
 
-    def change_access(self, level):
-        self._ACCESS_LEVEL = level
-        db.update_user(self._CHAT_ID, "access", self._ACCESS_LEVEL)
-
-    def change_new_post(self, new_post):
-        self._NEW_POST = new_post
-        db.update_user(self._CHAT_ID, "new_post", self._NEW_POST)
-
-    def change_midnight(self, midnight):
-        self._MIDNIGHT_EVENT = midnight
-        db.update_user(self._CHAT_ID, "midnight", self._MIDNIGHT_EVENT)
-
-    def change_admin_mode(self, admin_mode):
-        self._ADMIN_MODE = admin_mode
-        db.update_user(self._CHAT_ID, "admin_mode", self._ADMIN_MODE)
+    def change_flag(self, flag, value):
+        """Change 'flag' to 'value'
+        
+        Keyword arguments:
+        flag -- name of flag. Can be 'access', 'new_post', 'midnight', 'admin_mode'. String
+        value -- set the flag state. Bool
+        """
+        if flag == 'access':
+            self._ACCESS_TO_ALL = value
+            db.update_user(self._CHAT_ID, "access", self._ACCESS_TO_ALL)
+        elif flag == 'new_post':
+            self._NEW_POST = value
+            db.update_user(self._CHAT_ID, "new_post", self._NEW_POST)
+        elif flag == 'midnight':
+            self._MIDNIGHT_EVENT = value
+            db.update_user(self._CHAT_ID, "midnight", self._MIDNIGHT_EVENT)
+        elif flag == 'admin_mode':
+            self._ADMIN_MODE = value
+            db.update_user(self._CHAT_ID, "admin_mode", self._ADMIN_MODE)
 
     def send(self, message=None, attachment=None):
+        """Send to user something.
+
+        Keyword arguments:
+        message -- text of message. string
+        attachment -- name of attachment. string
+        """
         try:
             random_id = random.randint(-9223372036854775808,
                                        9223372036854775807)
@@ -792,80 +823,3 @@ class VkBot:
             debug_array['messages_answered'] += 1
         except Exception as e:
             log(True, f'Failed to send message: {str(e)}')
-
-
-def bots():
-    log(False, "Started listening longpull server")
-    debug_array['start_time'] = time.time()
-    for event in MyVkLongPoll.listen(longpoll):
-        try:
-            if event.type == VkBotEventType.MESSAGE_NEW:
-                log_msg = f'[MESSAGE] id: {event.message.id}, peer_id: {event.message.peer_id}, user_id: {event.message.from_id}'
-                if event.message.action:
-                    log_msg += f', action: '+event.message.action["type"]+', user id in action: '+ str(event.message.action["member_id"])
-                if event.message.text != "":
-                    log_msg += f', text: "{event.message.text}"'
-                if event.message.attachments:
-                    atch = ', attachments: '
-                    for i in event.message.attachments:
-                        if i['type'] == "sticker":
-                            atch += f"sticker_id{i[i['type']]['sticker_id']}"
-                        elif i['type'] == "wall":
-                            atch += i['type'] + str(i[i['type']]['from_id']) + \
-                                "_" + str(i[i['type']]['id']) + " "
-                        elif i['type'] == "link":
-                            atch +=  i['type'] + " " + i[i['type']]['title'] + " "
-                        else:
-                            atch += i['type'] + str(i[i['type']]['owner_id']) + \
-                                "_" + str(i[i['type']]['id']) + " "
-                    log_msg += atch
-                log(False, log_msg)
-                debug_array['messages_get'] += 1
-                if int(event.message.peer_id) in bot:
-                    bot[event.message.peer_id].get_message(event)
-                else:
-                    create_new_bot_object(event.message.peer_id)
-                    bot[event.message.peer_id].get_message(event)
-            elif event.type == VkBotEventType.WALL_POST_NEW:
-                log(False, f"[NEW_POST] id{event.object.id}")
-                users = db.get_all_users()
-                for i in users:
-                    if (config.use_database):
-                        bot[int(i['chat_id'])].event("post", event.object)
-                    else:
-                        bot[int(i)].event("post", event.object)
-            elif event.type == VkBotEventType.MESSAGE_DENY:
-                log(False,
-                    f"User {event.object.user_id} deny messages from that group")
-                del bot[int(event.object.user_id)]
-                db.delete_user(event.object.user_id)
-            else:
-                log(False, f"Event {str(event.type)} happend")
-        except Exception as kek:
-            log(True, f"Беды с ботом: {str(kek)}")
-            debug_array['bot_warnings'] += 1
-            continue
-
-
-def midnight():
-    while True:
-        current_time = time.time()+10800
-        if int(current_time) % 86400 == 0:
-            log(False, "[EVENT_STARTED] \"Midnight\"")
-            users = db.get_all_users()
-            for i in users:
-                if (config.use_database):
-                    bot[int(i['chat_id'])].event("midnight")
-                else:
-                    bot[int(i)].event("midnight")
-            log(False, "[EVENT_ENDED] \"Midnight\"")
-            time.sleep(1)
-        else:
-            time.sleep(0.50)
-
-
-load_users()
-tread_bots = threading.Thread(target=bots)
-tread_midnight = threading.Thread(target=midnight, daemon=True)
-tread_bots.start()
-tread_midnight.start()
