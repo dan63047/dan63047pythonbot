@@ -89,7 +89,6 @@ mysql_db = 'pythonanywhere_nickname$default' # Название вашей БД.
 * [Wikipedia-API](https://github.com/martin-majlis/Wikipedia-API) — модуль для получения статей из Wikipedia
 * [PyMySQL](https://github.com/PyMySQL/PyMySQL/) — Pure Python MySQL Client
 # Дополнительно
-С ботом можно пообщаться [здесь](https://vk.com/im?sel=-190322075)
 
 Автор бота: [Даниил Михайлов](https://vk.com/dan63047)
 
