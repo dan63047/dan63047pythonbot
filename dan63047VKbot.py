@@ -7,6 +7,7 @@ import logging
 import pyowm
 import random
 import json
+import re
 import threading
 import pymysql
 import wikipediaapi as wiki
@@ -312,7 +313,7 @@ class VkBot:
             self._OWNER = False
 
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!reminder", "!subscribe", "!random", "!admin_mode"]
+                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!ban", "!subscribe", "!random", "!admin_mode"]
 
     def __str__(self):
         return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_TO_ALL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}"
@@ -479,10 +480,10 @@ class VkBot:
                     try:
                         if message[1] == "owner":
                             respond['text'] = "Теперь некоторыми командами может пользоваться только владелец бота"
-                            self.change_flag('admin_mode', False)
+                            self._ACCESS_TO_ALL = False
                         elif message[1] == "all":
                             respond['text'] = "Теперь все могут пользоваться всеми командами"
-                            self.change_flag('admin_mode', True)
+                            self._ACCESS_TO_ALL = True
                         else:
                             respond['text'] = "Некорректный аргумент"
                     except IndexError:
@@ -498,7 +499,29 @@ class VkBot:
                     exit(log(False, "[SHUTDOWN]"))
 
             elif message[0] == self._COMMANDS[15]:
-                respond['text'] = "Функция удалена за ненадобнастью"
+                if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)) and self._ADMIN_MODE and int(self._CHAT_ID) > 2000000000:
+                    try:
+                        victum = re.search(r'id\d+', message[1]) 
+                        if int(victum[0][-2:]) != int(config.owner_id):
+                            vk.method("messages.removeChatUser", {"chat_id": int(
+                                self._CHAT_ID)-2000000000, "member_id": victum[0][-2:]})
+                            log(False,
+                                f"[BOT_{self._CHAT_ID}] user {victum[0]} has been kicked")
+                        else:
+                            log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
+                    except IndexError:
+                        respond['text'] = errors_array["miss_argument"]
+                    except Exception as e:
+                        respond['text'] = f"Ошибка: {str(e)}"
+                        log(True,
+                            f"[BOT_{self._CHAT_ID}] can't kick user {victum[0]} - {str(e)}")
+                else:
+                    if int(self._CHAT_ID) <= 2000000000:
+                        respond['text'] = "Данный чат не является беседой"
+                    if not self._ADMIN_MODE:
+                        respond["text"] = "Бот не в режиме модерирования"
+                    else:
+                        respond["text"] = errors_array["access"]
 
             elif message[0] == self._COMMANDS[16]:
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
@@ -527,6 +550,7 @@ class VkBot:
                             0, int(message[1][0]))
                 except:
                     respond['text'] = self.random_number(0, 10)
+
             elif message[0] == self._COMMANDS[18]:
                 if int(self._CHAT_ID) <= 2000000000:
                     respond['text'] = "Данный чат не является беседой"
@@ -548,6 +572,31 @@ class VkBot:
                                 f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
                     except Exception:
                         respond["text"] = "У меня нет прав администратора"
+            
+            elif message[0] == self._COMMANDS[19]: #бот не может восстанавливать пользователя из беседы, соре
+                if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)) and self._ADMIN_MODE:
+                    try:
+                        victum = re.search(r'id\d+', message[1]) 
+                        if int(victum[0][-2:]) != int(config.owner_id):
+                            vk.method("messages.addChatUser", {"chat_id": int(
+                                self._CHAT_ID)-2000000000, "user_id": victum[0][-2:]})
+                            log(False,
+                                f"[BOT_{self._CHAT_ID}] user {victum[0]} has been kicked")
+                        else:
+                            log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
+                    except IndexError:
+                        respond['text'] = errors_array["miss_argument"]
+                    except Exception as e:
+                        respond['text'] = f"Ошибка: {str(e)}"
+                        log(True,
+                            f"[BOT_{self._CHAT_ID}] can't kick user {victum[0]} - {str(e)}")
+                else:
+                    if int(self._CHAT_ID) <= 2000000000:
+                        respond['text'] = "Данный чат не является беседой"
+                    if not self._ADMIN_MODE:
+                        respond["text"] = "Бот не в режиме модерирования"
+                    else:
+                        respond["text"] = errors_array["access"]
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
