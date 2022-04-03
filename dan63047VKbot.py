@@ -302,8 +302,10 @@ class VkBot:
         self._ADMIN_MODE = admin_mode
         self._BANNED = banned
         self._OWNER = int(self._CHAT_ID) == int(config.owner_id)
-        self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!ban", "!subscribe", "!random", "!admin_mode", "!resist", "!restore"]
+        self._COMMANDS = ["!image", "!my_id", "!h", "!help", "!user_id", "!group_id", "!weather", "!wiki", "!byn", "!echo", "!game", 
+                          "!debug", "!midnight", "!access", "!turnoff", "!ban", "!subscribe", "!random", "!admin_mode", "!resist", "!restore",
+                          "!картинка", "!ид", "!п", "!помощь", "!пользователь", "!группа", "!погода", "!вики", "!белруб", "!эхо", "!игра",
+                          "!дебаг", "!полночь", "!доступ", "!выкл", "!бан", "!подписаться", "!рандом", "!админмод", "!запретить", "!разрешить"]
 
     def __str__(self):
         return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_TO_ALL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}, ban: {str(self._BANNED)}"
@@ -388,34 +390,34 @@ class VkBot:
             if (self._BANNED or db.get_from_users(int(event.message.from_id))["banned"]) and message[0] in self._COMMANDS:
                 respond['text'] = "Вам запрещено использовать бота"
 
-            elif message[0] == "!image":
+            elif message[0] == "!image" or message[0] == "!картинка":
                 if(random_image_command):
                     respond['attachment'] = self.random_image()
                 else:
                     respond['text'] = errors_array["command_off"]
 
-            elif message[0] == "!my_id":
+            elif message[0] == "!my_id" or message[0] == "!ид":
                 respond['text'] = "Ваш ид: " + str(user_id)
 
-            elif message[0] == "!h" or message[0] == "!help":
+            elif message[0] in ["!h", "!help", "!п", "!помощь"]:
                 with open('help.txt', 'r') as h:
                     help = h.read()
                     respond['text'] = help
                     h.close()
 
-            elif message[0] == "!user_id":
+            elif message[0] == "!user_id" or message[0] == "!пользователь":
                 try:
                     respond['text'] = self.get_info_user(message[1])
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == "!group_id":
+            elif message[0] == "!group_id" or message[0] == "!группа":
                 try:
                     respond['text'] = self.get_info_group(message[1])
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == "!weather":
+            elif message[0] == "!weather" or message[0] == "!погода":
                 if(weather_command):
                     try:
                         respond['text'] = get_weather(message[1])
@@ -424,28 +426,28 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["command_off"]
 
-            elif message[0] == "!wiki":
+            elif message[0] == "!wiki" or message[0] == "!вики":
                 try:
                     respond['text'] = self.wiki_article(message[1])
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == "!byn":
+            elif message[0] == "!byn" or message[0] == "!белруб":
                 respond['text'] = self.exchange_rates()
 
-            elif message[0] == "!echo":
+            elif message[0] == "!echo" or message[0] == "!эхо":
                 respond['text'] = "Теперь бот работает в режиме эхо. Чтобы это выключить, введить \"!echo off\""
                 self.change_await("echo")
                 log(False, f"[BOT_{self._CHAT_ID}] Enter in echo mode")
 
-            elif message[0] == "!game":
+            elif message[0] == "!game" or message[0] == "!игра":
                 try:
                     message[1] = message[1].lower()
                     respond['text'] = self.game(message[1], user_id)
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == "!debug":
+            elif message[0] == "!debug" or message[0] == "!дебаг":
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     try:
                         respond['text'] = self.debug(message[1])
@@ -454,7 +456,7 @@ class VkBot:
                 else:
                     respond["text"] = errors_array["access"]
 
-            elif message[0] == "!midnight":
+            elif message[0] == "!midnight" or message[0] == "!полночь":
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     if self._MIDNIGHT_EVENT:
                         self.change_flag('midnight', False)
@@ -469,13 +471,13 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["access"]
 
-            elif message[0] == "!access":
+            elif message[0] == "!access" or message[0] == "!доступ":
                 if int(user_id) == int(config.owner_id):
                     try:
-                        if message[1] == "owner":
+                        if message[1] == "owner" or message[1] == "владелец":
                             respond['text'] = "Теперь некоторыми командами может пользоваться только владелец бота"
                             self._ACCESS_TO_ALL = False
-                        elif message[1] == "all":
+                        elif message[1] == "all" or message[1] == "все":
                             respond['text'] = "Теперь все могут пользоваться всеми командами"
                             self._ACCESS_TO_ALL = True
                         else:
@@ -487,12 +489,12 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["access"]
 
-            elif message[0] == "!turnoff":
+            elif message[0] == "!turnoff" or message[0] == "!выкл":
                 if self._OWNER or int(user_id) == int(config.owner_id):
                     self.send("Бот выключается")
                     exit(log(False, "[SHUTDOWN]"))
 
-            elif message[0] == "!ban":
+            elif message[0] == "!ban" or message[0] == "!бан":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)) and self._ADMIN_MODE and int(self._CHAT_ID) > 2000000000:
                     try:
                         victum = re.search(r'id\d+', message[1])
@@ -516,7 +518,7 @@ class VkBot:
                     else:
                         respond["text"] = errors_array["access"]
 
-            elif message[0] == "!subscribe":
+            elif message[0] == "!subscribe" or message[0] == "!подписаться":
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     if self._NEW_POST:
                         self.change_flag('new_post', False)
@@ -532,7 +534,7 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["access"]
 
-            elif message[0] == "!random":
+            elif message[0] == "!random" or message[0] == "!рандом":
                 try:
                     message[1] = message[1].split(' ', 1)
                     try:
@@ -544,7 +546,7 @@ class VkBot:
                 except:
                     respond['text'] = self.random_number(0, 10)
 
-            elif message[0] == "!admin_mode":
+            elif message[0] == "!admin_mode" or message[0] == "!админмод":
                 if int(self._CHAT_ID) <= 2000000000:
                     respond['text'] = "Данный чат не является беседой"
                 elif int(user_id) != int(config.owner_id):
@@ -566,7 +568,7 @@ class VkBot:
                     except Exception:
                         respond["text"] = "У меня нет прав администратора"
             
-            elif message[0] == "!resist":
+            elif message[0] == "!resist" or message[0] == "!запретить":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
                     try:
                         victum = re.search(r'id\d+', message[1])
@@ -574,6 +576,7 @@ class VkBot:
                         if int(victum) != int(config.owner_id):
                             if int(victum) not in bot:
                                 create_new_bot_object(int(victum))
+                                db.set_new_user(int(victum))
                             if not db.get_from_users(int(victum))["banned"]:
                                 bot[int(victum)].change_flag("banned", True)
                                 respond["text"] = "Теперь он не сможет воспользоваться ботом"
@@ -591,13 +594,14 @@ class VkBot:
                 else:
                     respond["text"] = errors_array["access"]
 
-            elif message[0] == "!restore":
+            elif message[0] == "!restore" or message[0] == "!разрешить":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
                     try:
                         victum = re.search(r'id\d+', message[1])
                         victum = victum[0][2:]
                         if int(victum) not in bot:
                             create_new_bot_object(int(victum))
+                            db.set_new_user(int(victum))
                         if int(victum) != int(config.owner_id):
                             if db.get_from_users(int(victum))["banned"]:
                                 bot[int(victum)].change_flag("banned", False)
@@ -620,26 +624,24 @@ class VkBot:
                 self.send(respond['text'], respond['attachment'])
 
     def debug(self, arg=None):
-        if arg == "log":
-            if self._OWNER:
-                with open(log_path, 'r') as f:
-                    log = list(deque(f, 10))
-                    text_log = "<br>Последние 10 строк из лога:<br>"
-                    for i in range(len(log)):
-                        text_log += log[i]
-                    f.close()
-                return text_log
-            else:
+        if arg in ["log", "лог"]:
+            if not self._OWNER:
                 return errors_array["access"]
-        elif arg == "bots":
-            if self._OWNER:
-                answer = "Обьекты бота:"
-                for i in bot:
-                    answer += "<br>"+str(bot[i])
-                return answer
-            else:
+            with open(log_path, 'r') as f:
+                log = list(deque(f, 10))
+                text_log = "<br>Последние 10 строк из лога:<br>"
+                for item in log:
+                    text_log += item
+                f.close()
+            return text_log
+        elif arg in ["bots", "боты"]:
+            if not self._OWNER:
                 return errors_array["access"]
-        elif arg == "game":
+            answer = "Обьекты бота:"
+            for i in bot:
+                answer += f"<br>{str(bot[i])}"
+            return answer
+        elif arg in ["game", "игра"]:
             stats = db.get_game_stat()
             if len(stats) > 0:
                 answer = "Статистика игроков в !game"
@@ -665,14 +667,38 @@ class VkBot:
                 time_d, time_h, time_min, time_sec)
             datetime_time = datetime.datetime.fromtimestamp(
                 debug_array['start_time'])
-            answer = "UPTIME: " + str_up_time + "<br>Прослушано сообщений: " + str(
-                debug_array['messages_get']) + "<br>Отправлено сообщений: " + str(
-                debug_array['messages_answered']) + "<br>Ошибок в работе: " + str(
-                debug_array['logger_warnings']) + ", из них:<br> •Беды с ВК: " + str(
-                debug_array['vk_warnings']) + "<br> •Беды с БД: " + str(
-                debug_array['db_warnings']) + "<br> •Беды с ботом: " + str(
-                debug_array['bot_warnings']) + "<br>Обьектов бота: " + str(
-                len(bot)) + "<br>Запуск бота по часам сервера: " + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
+            answer = (
+                (
+                    (
+                        (
+                            (
+                                (
+                                    (
+                                        (
+                                            f"UPTIME: {str_up_time}<br>Прослушано сообщений: "
+                                            + str(debug_array['messages_get'])
+                                        )
+                                        + "<br>Отправлено сообщений: "
+                                    )
+                                    + str(debug_array['messages_answered'])
+                                    + "<br>Ошибок в работе: "
+                                )
+                                + str(debug_array['logger_warnings'])
+                                + ", из них:<br> •Беды с ВК: "
+                            )
+                            + str(debug_array['vk_warnings'])
+                            + "<br> •Беды с БД: "
+                        )
+                        + str(debug_array['db_warnings'])
+                        + "<br> •Беды с ботом: "
+                    )
+                    + str(debug_array['bot_warnings'])
+                    + "<br>Обьектов бота: "
+                )
+                + str(len(bot))
+                + "<br>Запуск бота по часам сервера: "
+            ) + datetime_time.strftime('%d.%m.%Y %H:%M:%S UTC')
+
             return answer
 
     def game(self, thing, user_id):
