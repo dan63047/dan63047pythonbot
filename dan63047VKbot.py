@@ -495,12 +495,11 @@ class VkBot:
             elif message[0] == "!ban":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)) and self._ADMIN_MODE and int(self._CHAT_ID) > 2000000000:
                     try:
-                        victum = re.search(r'id\d+', message[1]) 
-                        if int(victum[0][-2:]) != int(config.owner_id):
-                            vk.method("messages.removeChatUser", {"chat_id": int(
-                                self._CHAT_ID)-2000000000, "member_id": victum[0][-2:]})
-                            log(False,
-                                f"[BOT_{self._CHAT_ID}] user {victum[0]} has been kicked")
+                        victum = re.search(r'id\d+', message[1])
+                        victum = victum[0][2:]
+                        if int(victum) != int(config.owner_id):
+                            vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": victum})
+                            log(False, f"[BOT_{self._CHAT_ID}] user {victum} has been kicked")
                         else:
                             log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
                     except IndexError:
@@ -508,7 +507,7 @@ class VkBot:
                     except Exception as e:
                         respond['text'] = f"Ошибка: {str(e)}"
                         log(True,
-                            f"[BOT_{self._CHAT_ID}] can't kick user {victum[0]} - {str(e)}")
+                            f"[BOT_{self._CHAT_ID}] can't kick user {victum} - {str(e)}")
                 else:
                     if int(self._CHAT_ID) <= 2000000000:
                         respond['text'] = "Данный чат не является беседой"
@@ -570,14 +569,15 @@ class VkBot:
             elif message[0] == "!resist":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
                     try:
-                        victum = re.search(r'id\d+', message[1]) 
-                        if int(victum[0][-2:]) != int(config.owner_id):
-                            if int(victum[0][-2:]) not in bot:
-                                create_new_bot_object(int(victum[0][-2:]))
-                            if not db.get_from_users(int(victum[0][-2:])["banned"]):
-                                bot[int(victum[0][-2:])].change_flag("banned", True)
+                        victum = re.search(r'id\d+', message[1])
+                        victum = victum[0][2:]
+                        if int(victum) != int(config.owner_id):
+                            if int(victum) not in bot:
+                                create_new_bot_object(int(victum))
+                            if not db.get_from_users(int(victum))["banned"]:
+                                bot[int(victum)].change_flag("banned", True)
                                 respond["text"] = "Теперь он не сможет воспользоваться ботом"
-                                log(False, f"[BOT_{self._CHAT_ID}] user {victum[0]} has been resisted")
+                                log(False, f"[BOT_{self._CHAT_ID}] user {victum} has been resisted")
                             else:
                                 respond["text"] = "Он и так не может пользоваться ботом, вы уже делали это"
                         else:
@@ -587,7 +587,7 @@ class VkBot:
                     except Exception as e:
                         respond['text'] = f"Ошибка: {str(e)}"
                         log(True,
-                            f"[BOT_{self._CHAT_ID}] can't resist user {victum[0]} - {str(e)}")
+                            f"[BOT_{self._CHAT_ID}] can't resist user {victum} - {str(e)}")
                 else:
                     respond["text"] = errors_array["access"]
 
@@ -595,15 +595,16 @@ class VkBot:
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
                     try:
                         victum = re.search(r'id\d+', message[1])
-                        if int(victum[0][-2:]) not in bot:
-                                create_new_bot_object(int(victum[0][-2:]))
-                        if int(victum[0][-2:]) != int(config.owner_id):
-                            if db.get_from_users(int(victum[0][-2:])["banned"]):
-                                bot[int(victum[0][-2:])].change_flag("banned", False)
+                        victum = victum[0][2:]
+                        if int(victum) not in bot:
+                            create_new_bot_object(int(victum))
+                        if int(victum) != int(config.owner_id):
+                            if db.get_from_users(int(victum))["banned"]:
+                                bot[int(victum)].change_flag("banned", False)
                                 respond["text"] = "Теперь он снова сможет воспользоваться ботом"
-                                log(False, f"[BOT_{self._CHAT_ID}] user {victum[0]} has been resisted")
+                                log(False, f"[BOT_{self._CHAT_ID}] user {victum} has been restored")
                             else:
-                                respond["text"] = "Он и так не может пользоваться ботом, вы уже делали это"
+                                respond["text"] = "Он и так может пользоваться ботом"
                         else:
                             log(False, f"[BOT_{self._CHAT_ID}] can't restore owner")
                     except IndexError:
@@ -611,7 +612,7 @@ class VkBot:
                     except Exception as e:
                         respond['text'] = f"Ошибка: {str(e)}"
                         log(True,
-                            f"[BOT_{self._CHAT_ID}] can't restore user {victum[0]} - {str(e)}")
+                            f"[BOT_{self._CHAT_ID}] can't restore user {victum} - {str(e)}")
                 else:
                     respond["text"] = errors_array["access"]
 
