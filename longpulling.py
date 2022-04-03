@@ -16,7 +16,13 @@ def bots():
             if event.type == dan63047VKbot.VkBotEventType.MESSAGE_NEW:
                 log_msg = f'[MESSAGE] id: {event.message.id}, peer_id: {event.message.peer_id}, user_id: {event.message.from_id}'
                 if event.message.action:
-                    log_msg += f', action: '+event.message.action["type"]+', user id in action: '+ str(event.message.action["member_id"])
+                    log_msg += (
+                        ', action: '
+                        + event.message.action["type"]
+                        + ', user id in action: '
+                        + str(event.message.action["member_id"])
+                    )
+
                 if event.message.text != "":
                     log_msg += f', text: "{event.message.text}"'
                 if event.message.attachments:
@@ -35,11 +41,9 @@ def bots():
                     log_msg += atch
                 dan63047VKbot.log(False, log_msg)
                 dan63047VKbot.debug_array['messages_get'] += 1
-                if int(event.message.peer_id) in dan63047VKbot.bot:
-                    dan63047VKbot.bot[event.message.peer_id].get_message(event)
-                else:
+                if int(event.message.peer_id) not in dan63047VKbot.bot:
                     dan63047VKbot.create_new_bot_object(event.message.peer_id)
-                    dan63047VKbot.bot[event.message.peer_id].get_message(event)
+                dan63047VKbot.bot[event.message.peer_id].get_message(event)
             elif event.type == dan63047VKbot.VkBotEventType.WALL_POST_NEW:
                 if event.object.post_type == "post":
                     dan63047VKbot.log(False, f"[NEW_POST] id{event.object.id}")

@@ -92,7 +92,7 @@ except Exception:
 class Database_worker():
 
     def __init__(self):
-        if(config.use_database):
+        if config.use_database:
             log(False, "Trying to connect to database")
             try:
                 self._CON = pymysql.connect(
@@ -110,9 +110,9 @@ class Database_worker():
             try:
                 cur.execute("SELECT * FROM bot_users")
             except:
-                cur.execute("CREATE TABLE bot_users ( id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, chat_id INT UNSIGNED, awaiting VARCHAR(128), access TINYINT, midnight BOOL, new_post BOOL, admin_mode BOOL, game_wins INT UNSIGNED, game_defeats INT UNSIGNED, game_draws INT UNSIGNED)")
+                cur.execute("CREATE TABLE bot_users ( id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY, chat_id INT UNSIGNED, awaiting VARCHAR(128), access TINYINT, midnight BOOL, new_post BOOL, admin_mode BOOL, game_wins INT UNSIGNED, game_defeats INT UNSIGNED, game_draws INT UNSIGNED, banned BOOL)")
             cur.close()
-            log(False, f"Database connection established")
+            log(False, "Database connection established")
         else:
             log(False, "Bot will use JSON file as database")
             try:
@@ -123,12 +123,12 @@ class Database_worker():
                 log(True, "data.json is not exist, it will be created soon")
                 self._DATA_DIST = {"users": {}}
 
-    def set_new_user(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False, game_wins=0, game_defeats=0, game_draws=0):
+    def set_new_user(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False, game_wins=0, game_defeats=0, game_draws=0, banned=False):
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute("INSERT INTO bot_users (chat_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
-                            (peer_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws))
+                cur.execute("INSERT INTO bot_users (chat_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws, banned) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                            (peer_id, awaiting, access, midnight, new_post, admin_mode, game_wins, game_defeats, game_draws, banned))
                 self._CON.commit()
                 cur.close()
             except Exception as e:
@@ -136,52 +136,49 @@ class Database_worker():
                 log(True, f"Unable to add new user in database: {str(e)}")
         else:
             self._DATA_DIST['users'][peer_id] = {"awaiting": awaiting, "access": access, "midnight": midnight, "new_post": new_post,
-                                                 "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws}
+                                                 "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws, "banned": banned}
             open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
     def get_all_users(self):
-        if(config.use_database):
-            try:
-                cur = self._CON.cursor()
-                cur.execute("SELECT * FROM bot_users")
-                result = cur.fetchall()
-                cur.close()
-                return result
-            except Exception as e:
-                debug_array['db_warnings'] += 1
-                log(True, f"Unable to load user from database: {str(e)}")
-        else:
+        if not config.use_database:
             return self._DATA_DIST['users']
+        try:
+            cur = self._CON.cursor()
+            cur.execute("SELECT * FROM bot_users")
+            result = cur.fetchall()
+            cur.close()
+            return result
+        except Exception as e:
+            debug_array['db_warnings'] += 1
+            log(True, f"Unable to load user from database: {str(e)}")
 
     def get_from_users(self, from_id):
-        if(config.use_database):
-            try:
-                cur = self._CON.cursor()
-                cur.execute(
-                    "SELECT * FROM bot_users WHERE chat_id = %s", (from_id))
-                result = cur.fetchall()
-                cur.close()
-                return result
-            except Exception as e:
-                debug_array['db_warnings'] += 1
-                log(True, f"Unable to load user from database: {str(e)}")
-        else:
+        if not config.use_database:
             return self._DATA_DIST['users'][str(from_id)]
+        try:
+            cur = self._CON.cursor()
+            cur.execute(
+                "SELECT * FROM bot_users WHERE chat_id = %s", (from_id))
+            result = cur.fetchall()
+            cur.close()
+            return result
+        except Exception as e:
+            debug_array['db_warnings'] += 1
+            log(True, f"Unable to load user from database: {str(e)}")
 
     def get_game_stat(self):
-        if(config.use_database):
-            try:
-                cur = self._CON.cursor()
-                cur.execute(
-                    "SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
-                result = cur.fetchall()
-                cur.close()
-                return result
-            except Exception as e:
-                debug_array['db_warnings'] += 1
-                log(True, f"Unable to load stats from database: {str(e)}")
-        else:
+        if not config.use_database:
             return self._DATA_DIST['users']
+        try:
+            cur = self._CON.cursor()
+            cur.execute(
+                "SELECT chat_id, game_wins, game_draws, game_defeats FROM bot_users WHERE game_wins > 0 OR game_draws > 0 OR game_defeats > 0")
+            result = cur.fetchall()
+            cur.close()
+            return result
+        except Exception as e:
+            debug_array['db_warnings'] += 1
+            log(True, f"Unable to load stats from database: {str(e)}")
             # Info: dist cannot return only the necessary keys
 
     def update_user(self, chat_id, thing, new_value):
@@ -225,14 +222,13 @@ def load_users():
     try:
         log(False, "Reading database")
         get_info = db.get_all_users()
-        if(config.use_database):
-            for i in get_info:
+        for i in get_info:
+            if config.use_database:
                 bot[int(i['chat_id'])] = VkBot(int(i['chat_id']), bool(i['midnight']), i['awaiting'], int(
-                    i['access']), bool(i['new_post']), bool(i['admin_mode']))
-        else:
-            for i in get_info:
+                    i['access']), bool(i['new_post']), bool(i['admin_mode']), bool(i['banned']))
+            else:
                 bot[int(i)] = VkBot(int(i), bool(get_info[i]['midnight']), get_info[i]['awaiting'], int(
-                    get_info[i]['access']), bool(get_info[i]['new_post']), bool(get_info[i]['admin_mode']))
+                    get_info[i]['access']), bool(get_info[i]['new_post']), bool(get_info[i]['admin_mode']), bool(get_info[i]['banned']))
     except Exception as lol:
         debug_array['bot_warnings'] += 1
         log(True, f"Problem with creating objects: {str(lol)}")
@@ -246,10 +242,9 @@ class MyVkLongPoll(VkBotLongPoll):
     def listen(self):
         while True:
             try:
-                for event in self.check():
-                    yield event
+                yield from self.check()
             except Exception as e:
-                err = "A problem with VK LongPull: " + str(e)
+                err = f"A problem with VK LongPull: {str(e)}"
                 log(True, err)
                 debug_array['vk_warnings'] += 1
                 time.sleep(15)
@@ -265,7 +260,7 @@ def get_weather(place):
     try:
         weather_request = mgr.weather_at_place(place)
     except Exception as i:
-        err = "A problem with OpenWeather API: " + str(i)
+        err = f"A problem with OpenWeather API: {str(i)}"
         log(True, err)
         return "Такого города нет, либо данных о погоде нет"
     weather_status = weather_request.weather.detailed_status
@@ -287,7 +282,7 @@ class VkBot:
     admin_mode -- flag of moderating function, which moderate conversation. Defalt: False. Bool
     """
     
-    def __init__(self, peer_id, midnight=False, awaiting=None, access=True, new_post=False, admin_mode=False):
+    def __init__(self, peer_id, midnight=False, awaiting=None, access=True, new_post=False, admin_mode=False, banned=False):
         """Initialise the bot object\n\n
 
         Keyword arguments:\n
@@ -302,21 +297,16 @@ class VkBot:
         self._CHAT_ID = peer_id
         self._AWAITING_INPUT_MODE = awaiting
         self._ACCESS_TO_ALL = access
-        self._SET_UP_REMINDER = {"task": None, "time": None}
         self._MIDNIGHT_EVENT = midnight
         self._NEW_POST = new_post
         self._ADMIN_MODE = admin_mode
-
-        if int(self._CHAT_ID) == int(config.owner_id):
-            self._OWNER = True
-        else:
-            self._OWNER = False
-
+        self._BANNED = banned
+        self._OWNER = int(self._CHAT_ID) == int(config.owner_id)
         self._COMMANDS = ["!image", "!my_id", "!h", "!user_id", "!group_id", "!help", "!weather", "!wiki", "!byn",
-                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!ban", "!subscribe", "!random", "!admin_mode"]
+                          "!echo", "!game", "!debug", "!midnight", "!access", "!turnoff", "!ban", "!subscribe", "!random", "!admin_mode", "!resist", "!restore"]
 
     def __str__(self):
-        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_TO_ALL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}"
+        return f"[BOT_{str(self._CHAT_ID)}] a: {str(self._ACCESS_TO_ALL)}, mn: {str(self._MIDNIGHT_EVENT)}, await: {str(self._AWAITING_INPUT_MODE)}, sub: {str(self._NEW_POST)}, adm: {str(self._ADMIN_MODE)}, ban: {str(self._BANNED)}"
 
     def __del__(self):
         log(False, f"[BOT_{str(self._CHAT_ID)}] Bot-object has been deleted")
@@ -336,7 +326,7 @@ class VkBot:
             log(False, f"[BOT_{self._CHAT_ID}] Notified about midnight")
         elif event == "post" and self._NEW_POST:
             post = f"wall{str(something['from_id'])}_{str(something['id'])}"
-            self.send(f"Вышел новый пост", post)
+            self.send("Вышел новый пост", post)
             log(False, f"[BOT_{self._CHAT_ID}] Notified about new post")
 
     def get_message(self, event):
@@ -394,34 +384,38 @@ class VkBot:
                 self.send("Иди нахуй")
             respond = {'attachment': None, 'text': None}
             message = message.split(' ', 1)
-            if message[0] == self._COMMANDS[0]:
+
+            if (self._BANNED or db.get_from_users(int(event.message.from_id))["banned"]) and message[0] in self._COMMANDS:
+                respond['text'] = "Вам запрещено использовать бота"
+
+            elif message[0] == "!image":
                 if(random_image_command):
                     respond['attachment'] = self.random_image()
                 else:
                     respond['text'] = errors_array["command_off"]
 
-            elif message[0] == self._COMMANDS[1]:
+            elif message[0] == "!my_id":
                 respond['text'] = "Ваш ид: " + str(user_id)
 
-            elif message[0] == self._COMMANDS[2] or message[0] == self._COMMANDS[5]:
+            elif message[0] == "!h" or message[0] == "!help":
                 with open('help.txt', 'r') as h:
                     help = h.read()
                     respond['text'] = help
                     h.close()
 
-            elif message[0] == self._COMMANDS[3]:
+            elif message[0] == "!user_id":
                 try:
                     respond['text'] = self.get_info_user(message[1])
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == self._COMMANDS[4]:
+            elif message[0] == "!group_id":
                 try:
                     respond['text'] = self.get_info_group(message[1])
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == self._COMMANDS[6]:
+            elif message[0] == "!weather":
                 if(weather_command):
                     try:
                         respond['text'] = get_weather(message[1])
@@ -430,28 +424,28 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["command_off"]
 
-            elif message[0] == self._COMMANDS[7]:
+            elif message[0] == "!wiki":
                 try:
                     respond['text'] = self.wiki_article(message[1])
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == self._COMMANDS[8]:
+            elif message[0] == "!byn":
                 respond['text'] = self.exchange_rates()
 
-            elif message[0] == self._COMMANDS[9]:
+            elif message[0] == "!echo":
                 respond['text'] = "Теперь бот работает в режиме эхо. Чтобы это выключить, введить \"!echo off\""
                 self.change_await("echo")
                 log(False, f"[BOT_{self._CHAT_ID}] Enter in echo mode")
 
-            elif message[0] == self._COMMANDS[10]:
+            elif message[0] == "!game":
                 try:
                     message[1] = message[1].lower()
                     respond['text'] = self.game(message[1], user_id)
                 except IndexError:
                     respond['text'] = errors_array["miss_argument"]
 
-            elif message[0] == self._COMMANDS[11]:
+            elif message[0] == "!debug":
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     try:
                         respond['text'] = self.debug(message[1])
@@ -460,7 +454,7 @@ class VkBot:
                 else:
                     respond["text"] = errors_array["access"]
 
-            elif message[0] == self._COMMANDS[12]:
+            elif message[0] == "!midnight":
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     if self._MIDNIGHT_EVENT:
                         self.change_flag('midnight', False)
@@ -475,7 +469,7 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["access"]
 
-            elif message[0] == self._COMMANDS[13]:
+            elif message[0] == "!access":
                 if int(user_id) == int(config.owner_id):
                     try:
                         if message[1] == "owner":
@@ -493,12 +487,12 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["access"]
 
-            elif message[0] == self._COMMANDS[14]:
+            elif message[0] == "!turnoff":
                 if self._OWNER or int(user_id) == int(config.owner_id):
                     self.send("Бот выключается")
                     exit(log(False, "[SHUTDOWN]"))
 
-            elif message[0] == self._COMMANDS[15]:
+            elif message[0] == "!ban":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)) and self._ADMIN_MODE and int(self._CHAT_ID) > 2000000000:
                     try:
                         victum = re.search(r'id\d+', message[1]) 
@@ -523,7 +517,7 @@ class VkBot:
                     else:
                         respond["text"] = errors_array["access"]
 
-            elif message[0] == self._COMMANDS[16]:
+            elif message[0] == "!subscribe":
                 if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
                     if self._NEW_POST:
                         self.change_flag('new_post', False)
@@ -539,7 +533,7 @@ class VkBot:
                 else:
                     respond['text'] = errors_array["access"]
 
-            elif message[0] == self._COMMANDS[17]:
+            elif message[0] == "!random":
                 try:
                     message[1] = message[1].split(' ', 1)
                     try:
@@ -551,7 +545,7 @@ class VkBot:
                 except:
                     respond['text'] = self.random_number(0, 10)
 
-            elif message[0] == self._COMMANDS[18]:
+            elif message[0] == "!admin_mode":
                 if int(self._CHAT_ID) <= 2000000000:
                     respond['text'] = "Данный чат не является беседой"
                 elif int(user_id) != int(config.owner_id):
@@ -573,30 +567,53 @@ class VkBot:
                     except Exception:
                         respond["text"] = "У меня нет прав администратора"
             
-            elif message[0] == self._COMMANDS[19]: #бот не может восстанавливать пользователя из беседы, соре
-                if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)) and self._ADMIN_MODE:
+            elif message[0] == "!resist":
+                if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
                     try:
                         victum = re.search(r'id\d+', message[1]) 
                         if int(victum[0][-2:]) != int(config.owner_id):
-                            vk.method("messages.addChatUser", {"chat_id": int(
-                                self._CHAT_ID)-2000000000, "user_id": victum[0][-2:]})
-                            log(False,
-                                f"[BOT_{self._CHAT_ID}] user {victum[0]} has been kicked")
+                            if int(victum[0][-2:]) not in bot:
+                                create_new_bot_object(int(victum[0][-2:]))
+                            if not db.get_from_users(int(victum[0][-2:])["banned"]):
+                                bot[int(victum[0][-2:])].change_flag("banned", True)
+                                respond["text"] = "Теперь он не сможет воспользоваться ботом"
+                                log(False, f"[BOT_{self._CHAT_ID}] user {victum[0]} has been resisted")
+                            else:
+                                respond["text"] = "Он и так не может пользоваться ботом, вы уже делали это"
                         else:
-                            log(False, f"[BOT_{self._CHAT_ID}] can't kick owner")
+                            log(False, f"[BOT_{self._CHAT_ID}] can't resist owner")
                     except IndexError:
                         respond['text'] = errors_array["miss_argument"]
                     except Exception as e:
                         respond['text'] = f"Ошибка: {str(e)}"
                         log(True,
-                            f"[BOT_{self._CHAT_ID}] can't kick user {victum[0]} - {str(e)}")
+                            f"[BOT_{self._CHAT_ID}] can't resist user {victum[0]} - {str(e)}")
                 else:
-                    if int(self._CHAT_ID) <= 2000000000:
-                        respond['text'] = "Данный чат не является беседой"
-                    if not self._ADMIN_MODE:
-                        respond["text"] = "Бот не в режиме модерирования"
-                    else:
-                        respond["text"] = errors_array["access"]
+                    respond["text"] = errors_array["access"]
+
+            elif message[0] == "!restore":
+                if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
+                    try:
+                        victum = re.search(r'id\d+', message[1])
+                        if int(victum[0][-2:]) not in bot:
+                                create_new_bot_object(int(victum[0][-2:]))
+                        if int(victum[0][-2:]) != int(config.owner_id):
+                            if db.get_from_users(int(victum[0][-2:])["banned"]):
+                                bot[int(victum[0][-2:])].change_flag("banned", False)
+                                respond["text"] = "Теперь он снова сможет воспользоваться ботом"
+                                log(False, f"[BOT_{self._CHAT_ID}] user {victum[0]} has been resisted")
+                            else:
+                                respond["text"] = "Он и так не может пользоваться ботом, вы уже делали это"
+                        else:
+                            log(False, f"[BOT_{self._CHAT_ID}] can't restore owner")
+                    except IndexError:
+                        respond['text'] = errors_array["miss_argument"]
+                    except Exception as e:
+                        respond['text'] = f"Ошибка: {str(e)}"
+                        log(True,
+                            f"[BOT_{self._CHAT_ID}] can't restore user {victum[0]} - {str(e)}")
+                else:
+                    respond["text"] = errors_array["access"]
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
@@ -853,6 +870,9 @@ class VkBot:
         elif flag == 'admin_mode':
             self._ADMIN_MODE = value
             db.update_user(self._CHAT_ID, "admin_mode", self._ADMIN_MODE)
+        elif flag == "banned":
+            self._BANNED = value
+            db.update_user(self._CHAT_ID, "banned", self._BANNED)
 
     def send(self, message=None, attachment=None):
         """Send to user something.
