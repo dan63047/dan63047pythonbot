@@ -141,6 +141,9 @@ class Database_worker():
 
     def get_all_users(self):
         if not config.use_database:
+            with open("data.json", "r") as data:
+                self._DATA_DIST = json.load(data)
+                data.close()
             return self._DATA_DIST['users']
         try:
             cur = self._CON.cursor()
@@ -154,6 +157,9 @@ class Database_worker():
 
     def get_from_users(self, from_id):
         if not config.use_database:
+            with open("data.json", "r") as data:
+                self._DATA_DIST = json.load(data)
+                data.close()
             return self._DATA_DIST['users'][str(from_id)]
         try:
             cur = self._CON.cursor()
