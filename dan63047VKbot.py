@@ -44,7 +44,9 @@ def log(warning, text):
 
 bot = {}
 errors_array = {"access": "Отказано в доступе",
-                "miss_argument": "Отсуствует аргумент", "command_off": "Команда отключена"}
+                "miss_argument": "Отсуствует аргумент", 
+                "command_off": "Команда отключена",
+                "not_a_multichat": "Данный чат не является беседой"}
 
 try:
     vk = vk_api.VkApi(token=config.vk_group_token)
@@ -191,15 +193,16 @@ class Database_worker():
         if(config.use_database):
             try:
                 cur = self._CON.cursor()
-                cur.execute(
-                    f"UPDATE bot_users SET {thing} = %s WHERE bot_users.chat_id = %s;", (new_value, chat_id))
+                cur.execute(f"UPDATE bot_users SET {thing} = %s WHERE bot_users.chat_id = %s;", (new_value, chat_id))
                 self._CON.commit()
                 cur.close()
             except Exception as e:
                 debug_array['db_warnings'] += 1
-                log(True,
-                    f"Unable to update info about user in database: {str(e)}")
+                log(True, f"Unable to update info about user in database: {str(e)}")
         else:
+            if not data['bot-data'].get(thing):
+                if thing == "spam_list":
+                    self._DATA_DIST['users'][str(chat_id)][thing] = []
             self._DATA_DIST['users'][str(chat_id)][thing] = new_value
             open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
@@ -301,6 +304,7 @@ class VkBot:
         """
         log(False, f"[BOT_{peer_id}] Created new bot-object")
         self._CHAT_ID = peer_id
+        self._SPAMMER_LIST = {}
         self._AWAITING_INPUT_MODE = awaiting
         self._ACCESS_TO_ALL = access
         self._MIDNIGHT_EVENT = midnight
@@ -369,10 +373,17 @@ class VkBot:
                 action = event.message.action
                 if action['type'] == 'chat_invite_user' or action['type'] == 'chat_invite_user_by_link':
                     user_info = vk.method('users.get', {'user_ids': action["member_id"], 'fields': 'verified,last_seen,sex'})
+                    chat_info = db.get_from_users(int(self._CHAT_ID))
+                    if chat_info.get("spam_list"):
+                        if int(action["member_id"]) in chat_info["spam_list"]:
+                            self.send(f'Привет, {user_info[0]["first_name"]}. К сожалению, администраторы этой беседы признали тебя спамером, поэтому мне придётся выгнать тебя отсюда')
+                            vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": action["member_id"]})
+                            return
                     self.send(f'Добро пожаловать в беседу, {user_info[0]["first_name"]} {user_info[0]["last_name"]}')
                 elif action['type'] == 'chat_kick_user':
-                    user_info = vk.method('users.get', {'user_ids': action["member_id"], 'fields': 'verified,last_seen,sex'})
-                    self.send(f'{user_info[0]["first_name"]} {user_info[0]["last_name"]} покинул беседу')
+                    pass
+                    # user_info = vk.method('users.get', {'user_ids': action["member_id"], 'fields': 'verified,last_seen,sex'})
+                    # self.send(f'{user_info[0]["first_name"]} {user_info[0]["last_name"]} покинул беседу')
         if self._AWAITING_INPUT_MODE:
             if message == "Назад":
                 self.change_await()
@@ -518,7 +529,7 @@ class VkBot:
                             f"[BOT_{self._CHAT_ID}] can't kick user {victum} - {str(e)}")
                 else:
                     if int(self._CHAT_ID) <= 2000000000:
-                        respond['text'] = "Данный чат не является беседой"
+                        respond['text'] = errors_array["not_a_multichat"]
                     if not self._ADMIN_MODE:
                         respond["text"] = "Бот не в режиме модерирования"
                     else:
@@ -554,7 +565,7 @@ class VkBot:
 
             elif message[0] == "!admin_mode" or message[0] == "!админмод":
                 if int(self._CHAT_ID) <= 2000000000:
-                    respond['text'] = "Данный чат не является беседой"
+                    respond['text'] = errors_array["not_a_multichat"]
                 elif int(user_id) != int(config.owner_id):
                     respond['text'] = errors_array["access"]
                 else:
@@ -625,6 +636,45 @@ class VkBot:
                             f"[BOT_{self._CHAT_ID}] can't restore user {victum} - {str(e)}")
                 else:
                     respond["text"] = errors_array["access"]
+
+            elif message[0] == "!spammer" or message[0] == "!спаммер":
+                if int(self._CHAT_ID) <= 2000000000:
+                    respond['text'] = errors_array["not_a_multichat"]
+                elif (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
+                    try:
+                        message = message[1].split(' ', 1)
+                        victum = re.search(r'id\d+', message[1])
+                        victum = victum[0][2:]
+                        if db.get_from_users(int(self._CHAT_ID)).get("spam_list"):
+                            chat_spammers_list = db.get_from_users(int(self._CHAT_ID))["spam_list"]
+                        else:
+                            chat_spammers_list = []
+                        if message[0] == "add" or message [0] == "добавить":
+                            if int(victum) != int(config.owner_id):
+                                if int(victum) not in chat_spammers_list:
+                                    chat_spammers_list.append(int(victum))
+                                    respond["text"] = "Теперь он считается спамером"
+                                    log(False, f"[BOT_{self._CHAT_ID}] user {victum} added to spammer list")
+                                else:
+                                    respond["text"] = "Он и так уже в этой базе"  
+                            else:
+                                log(False, f"[BOT_{self._CHAT_ID}] can't add to spammer list owner")
+                        elif message[0] == "remove" or message[0] == "удалить":
+                            if int(victum) != int(config.owner_id):
+                                if int(victum) in chat_spammers_list:
+                                    chat_spammers_list.pop(int(victum))
+                                    respond["text"] = "Теперь он не считается спамером"
+                                    log(False, f"[BOT_{self._CHAT_ID}] user {victum} removed to spammer list")
+                                else:
+                                    respond["text"] = "Его нет в этой базе"  
+                            else:
+                                log(False, f"[BOT_{self._CHAT_ID}] can't restore owner")
+                        db.update_user(int(self._CHAT_ID), "spam_list", chat_spammers_list)
+                    except IndexError:
+                        respond['text'] = errors_array["miss_argument"]
+                    except Exception as e:
+                        respond['text'] = f"Ошибка: {str(e)}"
+                        log(True, f"[BOT_{self._CHAT_ID}] spammer action {message[1]} with {victum} - {str(e)}")
 
             if respond['text'] or respond['attachment']:
                 self.send(respond['text'], respond['attachment'])
