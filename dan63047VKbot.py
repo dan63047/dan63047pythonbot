@@ -162,6 +162,8 @@ class Database_worker():
             with open("data.json", "r") as data:
                 self._DATA_DIST = json.load(data)
                 data.close()
+            if not self._DATA_DIST['users'].get(str(from_id)):
+                self.set_new_user(str(from_id))
             return self._DATA_DIST['users'][str(from_id)]
         try:
             cur = self._CON.cursor()
