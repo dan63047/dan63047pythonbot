@@ -200,7 +200,7 @@ class Database_worker():
                 debug_array['db_warnings'] += 1
                 log(True, f"Unable to update info about user in database: {str(e)}")
         else:
-            if not data['bot-data'].get(thing):
+            if not self._DATA_DIST['users'][str(chat_id)].get(thing):
                 if thing == "spam_list":
                     self._DATA_DIST['users'][str(chat_id)][thing] = []
             self._DATA_DIST['users'][str(chat_id)][thing] = new_value
@@ -575,15 +575,13 @@ class VkBot:
                         if self._ADMIN_MODE:
                             respond["text"] = "Режим модерирования выключен"
                             self.change_flag('admin_mode', False)
-                            log(False,
-                                f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
+                            log(False, f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
                         else:
                             respond["text"] = "Режим модерирования включён"
                             self.change_flag('admin_mode', True)
-                            log(False,
-                                f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
-                    except Exception:
-                        respond["text"] = "У меня нет прав администратора"
+                            log(False, f"[BOT_{self._CHAT_ID}] Admin mode: {self._ADMIN_MODE}")
+                    except Exception as e:
+                        respond["text"] = f"Ошибка: {str(e)}"
             
             elif message[0] == "!resist" or message[0] == "!запретить":
                 if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
