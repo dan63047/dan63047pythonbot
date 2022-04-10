@@ -879,6 +879,5 @@ class VkBot:
             peer_users_list = vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": config.group_id})
             for i in peer_users_list["items"]:
                 if i['member_id'] in SPAMMER_LIST:
-                    respond['text'] += ", исключаю..."
                     self.send(f'[id{user_id}|Данный пользователь] находится в антиспам базе. Исключаю...')
                     vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": i['member_id']})
