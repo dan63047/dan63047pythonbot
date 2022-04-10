@@ -43,7 +43,7 @@ def log(warning, text):
         print(msg)
 
 bot = {}
-SPAMMER_LIST = {}
+SPAMMER_LIST = []
 errors_array = {"access": "Отказано в доступе",
                 "miss_argument": "Отсуствует аргумент", 
                 "command_off": "Команда отключена",
@@ -105,7 +105,7 @@ class Database_worker():
             open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
     def set_new_user(self, peer_id, midnight=False, awaiting=None, access=1, new_post=False, admin_mode=False, game_wins=0, game_defeats=0, game_draws=0, banned=False):
-        self._DATA_DIST['users'][peer_id] = {"awaiting": awaiting, "access": access, "midnight": midnight, "new_post": new_post, "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws, "banned": banned}
+        self._DATA_DIST['users'][peer_id] = {"awaiting": awaiting, "access": access, "midnight": midnight, "new_post": new_post, "admin_mode": admin_mode, "game_wins": game_wins, "game_defeats": game_defeats, "game_draws": game_draws, "banned": banned, "warns": 0}
         open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
     def get_all_users(self):
@@ -139,8 +139,8 @@ class Database_worker():
         open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
     def remove_spammer(self, user_id):
-        SPAMMER_LIST.pop(int(user_id))
-        self._DATA_DIST["spammers"].pop(int(user_id))
+        SPAMMER_LIST.remove(int(user_id))
+        self._DATA_DIST["spammers"].remove(int(user_id))
         open("data.json", "w").write(json.dumps(self._DATA_DIST))
 
     def read_spammers(self):
@@ -374,7 +374,7 @@ class VkBot:
                     respond['text'] = errors_array["miss_argument"]
 
             elif message[0] == "!debug" or message[0] == "!дебаг":
-                if self._ACCESS_TO_ALL or int(user_id) == int(config.owner_id):
+                if (self._OWNER or int(user_id) in config.admins or int(user_id) == int(config.owner_id)):
                     try:
                         respond['text'] = self.debug(message[1])
                     except IndexError:
@@ -558,6 +558,9 @@ class VkBot:
                                     db.add_spammer(int(victum))
                                     respond["text"] = "Теперь он считается спамером"
                                     log(False, f"[BOT_{self._CHAT_ID}] user {victum} added to spammer list")
+                                    for i in bot:
+                                        if i > 2000000000:
+                                            bot[i].kick_spammers()
                                 else:
                                     respond["text"] = "Он и так уже в этой базе"  
                             else:
@@ -870,3 +873,12 @@ class VkBot:
             debug_array['messages_answered'] += 1
         except Exception as e:
             log(True, f'Failed to send message: {str(e)}')
+
+    def kick_spammers(self):
+        if self._CHAT_ID > 2000000000 and self._ADMIN_MODE:
+            peer_users_list = vk.method("messages.getConversationMembers", {"peer_id": int(self._CHAT_ID), "group_id": config.group_id})
+            for i in peer_users_list["items"]:
+                if i['member_id'] in SPAMMER_LIST:
+                    respond['text'] += ", исключаю..."
+                    self.send(f'[id{user_id}|Данный пользователь] находится в антиспам базе. Исключаю...')
+                    vk.method("messages.removeChatUser", {"chat_id": int(self._CHAT_ID)-2000000000, "member_id": i['member_id']})
