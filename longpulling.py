@@ -41,18 +41,20 @@ def bots():
                     log_msg += atch
                 dan63047VKbot.log(False, log_msg)
                 dan63047VKbot.debug_array['messages_get'] += 1
-                if int(event.message.peer_id) not in dan63047VKbot.bot:
-                    dan63047VKbot.create_new_bot_object(event.message.peer_id)
+                if event.message.peer_id not in dan63047VKbot.bot:
+                    u = dan63047VKbot.db.get_all_users()
+                    if str(event.message.peer_id) not in u:
+                        dan63047VKbot.create_new_bot_object(event.message.peer_id)
+                    else:
+                        i = dan63047VKbot.db.get_from_users(event.message.peer_id)
+                        dan63047VKbot.bot[event.message.peer_id] = dan63047VKbot.VkBot(event.message.peer_id, bool(i['midnight']), i['awaiting'], int(i['access']), bool(i['new_post']), bool(i['admin_mode']), bool(i['banned']))
                 dan63047VKbot.bot[event.message.peer_id].get_message(event)
             elif event.type == dan63047VKbot.VkBotEventType.WALL_POST_NEW:
                 if event.object.post_type == "post":
                     dan63047VKbot.log(False, f"[NEW_POST] id{event.object.id}")
                     users = dan63047VKbot.db.get_all_users()
                     for i in users:
-                        if (config.use_database):
-                            dan63047VKbot.bot[int(i['chat_id'])].event("post", event.object)
-                        else:
-                            dan63047VKbot.bot[int(i)].event("post", event.object)
+                        dan63047VKbot.bot[int(i)].event("post", event.object)
                 else:
                     dan63047VKbot.log(False, f"[NEW_OFFER] id{event.object.id}")
             elif event.type == dan63047VKbot.VkBotEventType.MESSAGE_DENY:
@@ -75,17 +77,14 @@ def midnight():
             dan63047VKbot.log(False, "[EVENT_STARTED] \"Midnight\"")
             users = dan63047VKbot.db.get_all_users()
             for i in users:
-                if (config.use_database):
-                    dan63047VKbot.bot[int(i['chat_id'])].event("midnight")
-                else:
-                    dan63047VKbot.bot[int(i)].event("midnight")
+                dan63047VKbot.bot[int(i)].event("midnight")
             dan63047VKbot.log(False, "[EVENT_ENDED] \"Midnight\"")
             time.sleep(1)
         else:
             time.sleep(0.50)
 
 
-dan63047VKbot.load_users()
+dan63047VKbot.SPAMMER_LIST = dan63047VKbot.db.read_spammers()
 tread_bots = threading.Thread(target=bots)
 tread_midnight = threading.Thread(target=midnight, daemon=True)
 tread_bots.start()
