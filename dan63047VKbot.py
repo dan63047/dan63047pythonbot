@@ -9,10 +9,8 @@ import random
 import json
 import re
 import threading
-import pymysql
 import wikipediaapi as wiki
 import config
-from pymysql.cursors import DictCursor
 from pyowm.utils.config import get_default_config
 from collections import deque
 from vk_api.bot_longpoll import VkBotLongPoll, VkBotEventType
