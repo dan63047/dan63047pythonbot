@@ -120,9 +120,6 @@ class Database_worker():
             self.set_new_user(str(from_id))
         return self._DATA_DIST['users'][str(from_id)]
 
-    def get_game_stat(self):
-        return self._DATA_DIST['users']
-
     def update_user(self, chat_id, thing, new_value):        
         self._DATA_DIST['users'][str(chat_id)][thing] = new_value
         open("data.json", "w").write(json.dumps(self._DATA_DIST))
@@ -166,11 +163,6 @@ class MyVkLongPoll(VkBotLongPoll):
                 continue
 
 
-def create_new_bot_object(chat_id):
-    bot[chat_id] = VkBot(chat_id)
-    db.set_new_user(chat_id)
-
-
 def get_weather(place):
     try:
         weather_request = mgr.weather_at_place(place)
@@ -197,7 +189,7 @@ class VkBot:
     admin_mode -- flag of moderating function, which moderate conversation. Defalt: False. Bool
     """
     
-    def __init__(self, peer_id, midnight=False, awaiting=None, access=True, new_post=False, admin_mode=False, banned=False):
+    def __init__(self, peer_id):
         """Initialise the bot object\n\n
 
         Keyword arguments:\n
@@ -209,13 +201,14 @@ class VkBot:
         admin_mode -- flag of moderating function, which moderate conversation. Defalt: False. Bool
         """
         log(False, f"[BOT_{peer_id}] Created new bot-object")
+        db_entry = db.get_from_users(int(peer_id))
         self._CHAT_ID = peer_id
-        self._AWAITING_INPUT_MODE = awaiting
-        self._ACCESS_TO_ALL = access
-        self._MIDNIGHT_EVENT = midnight
-        self._NEW_POST = new_post
-        self._ADMIN_MODE = admin_mode
-        self._BANNED = banned
+        self._AWAITING_INPUT_MODE = db_entry['awaiting']
+        self._ACCESS_TO_ALL = bool(db_entry['access'])
+        self._MIDNIGHT_EVENT = bool(db_entry['midnight'])
+        self._NEW_POST = bool(db_entry['new_post'])
+        self._ADMIN_MODE = bool(db_entry['admin_mode'])
+        self._BANNED = bool(db_entry['banned'])
         self._OWNER = int(self._CHAT_ID) == int(config.owner_id)
         self._COMMANDS = ["!image", "!my_id", "!h", "!help", "!user_id", "!group_id", "!weather", "!wiki", "!byn", "!echo", "!game", 
                           "!debug", "!midnight", "!access", "!turnoff", "!ban", "!subscribe", "!random", "!admin_mode", "!resist", "!restore",
@@ -497,7 +490,7 @@ class VkBot:
                         victum = victum[0][2:]
                         if int(victum) != int(config.owner_id):
                             if int(victum) not in bot:
-                                create_new_bot_object(int(victum))
+                                bot[user_id] = VkBot(int(victum))
                                 db.set_new_user(int(victum))
                             if not db.get_from_users(int(victum))["banned"]:
                                 bot[int(victum)].change_flag("banned", True)
@@ -522,7 +515,7 @@ class VkBot:
                         victum = re.search(r'id\d+', message[1])
                         victum = victum[0][2:]
                         if int(victum) not in bot:
-                            create_new_bot_object(int(victum))
+                            bot[user_id] = VkBot(int(victum))
                             db.set_new_user(int(victum))
                         if int(victum) != int(config.owner_id):
                             if db.get_from_users(int(victum))["banned"]:

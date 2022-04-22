@@ -44,10 +44,10 @@ def bots():
                 if event.message.peer_id not in dan63047VKbot.bot:
                     u = dan63047VKbot.db.get_all_users()
                     if str(event.message.peer_id) not in u:
-                        dan63047VKbot.create_new_bot_object(event.message.peer_id)
+                        dan63047VKbot.bot[user_id] = dan63047VKbot.VkBot(event.message.peer_id)
                     else:
                         i = dan63047VKbot.db.get_from_users(event.message.peer_id)
-                        dan63047VKbot.bot[event.message.peer_id] = dan63047VKbot.VkBot(event.message.peer_id, bool(i['midnight']), i['awaiting'], int(i['access']), bool(i['new_post']), bool(i['admin_mode']), bool(i['banned']))
+                        dan63047VKbot.bot[event.message.peer_id] = dan63047VKbot.VkBot(event.message.peer_id)
                 dan63047VKbot.bot[event.message.peer_id].get_message(event)
             elif event.type == dan63047VKbot.VkBotEventType.WALL_POST_NEW:
                 if event.object.post_type == "post":

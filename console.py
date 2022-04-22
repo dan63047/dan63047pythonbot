@@ -130,7 +130,7 @@ def cycle():
                             log(True, "Bot object is not exist: "+str(e))
                     elif command[1][0] == "create":
                         try:
-                            dan63047VKbot.create_new_bot_object(command[1][1])
+                            dan63047VKbot.bot[user_id] = dan63047VKbot.VkBot(command[1][1])
                             log(False, "Bot-object has been created")
                         except Exception as e:
                             log(True, "Can't create bot-object - "+str(e))
