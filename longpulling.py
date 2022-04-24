@@ -14,7 +14,7 @@ def bots():
     for event in dan63047VKbot.MyVkLongPoll.listen(dan63047VKbot.longpoll):
         try:
             if event.type == dan63047VKbot.VkBotEventType.MESSAGE_NEW:
-                log_msg = f'[MESSAGE] id: {event.message.id}, peer_id: {event.message.peer_id}, user_id: {event.message.from_id}'
+                log_msg = f'[MESSAGE] #{event.message.conversation_message_id} in peer {event.message.peer_id}, by id_{event.message.from_id}'
                 if event.message.action:
                     log_msg += (
                         ', action: '
